@@ -40,5 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# prisma 7 generated client
+/src/generated/
+
 # superpowers SDD scratch (progress ledger, task briefs)
 .superpowers/

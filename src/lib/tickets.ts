@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { TicketStatus } from "@prisma/client";
+import type { TicketStatus } from "../generated/prisma/client";
 
 export type TicketListItem = {
   id: string;
