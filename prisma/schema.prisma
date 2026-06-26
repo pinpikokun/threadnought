@@ -182,3 +182,8 @@ model Settings {
   agingDangerDays     Int     @default(7)
   statusColors        Json?
 }
+
+model Counter {
+  prefix String @id
+  value  Int    @default(0)
+}
