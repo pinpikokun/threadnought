@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Threadnought 🧵⚓
 
-## Getting Started
+**Turn a shared mailbox into a tidy ticket queue.** Threadnought pulls email from a real mailbox over IMAP and organizes it into **tickets** — threading replies together, numbering cases, de-duplicating, and automatically reopening a closed ticket when a customer writes back.
 
-First, run the development server:
+> A production-minded portfolio project, designed and built end-to-end with AI agents (Claude Code).
 
+## Status — work in progress
+- ✅ **Phase 1 · Foundation** — data model, database, ticket list
+- ✅ **Phase 2 · Mail ingestion** — IMAP receive, thread-linking, case numbering, de-duplication, auto-reopen (validated against a real inbox)
+- ⏭️ **Next** — Phase 3 replies (SMTP) · Phase 4 operations · Phase 5 auth · Phase 6 search / attachments / notifications / UI polish
+
+## Tech stack
+- **Next.js 16** (App Router) · **TypeScript**
+- **Prisma 7** · **PostgreSQL** (Neon serverless, via the official driver adapter)
+- **IMAP** with `imapflow` + `mailparser`
+- **Vitest**
+
+## Architecture
+Ports & adapters throughout, so the core logic never depends on a concrete service:
+
+| Concern | Port (interface) | Default adapter |
+|---|---|---|
+| Receive mail | `MailReceiver` | IMAP |
+| Send mail | `MailSender` | SMTP *(Phase 3)* |
+| Search | `SearchProvider` | PostgreSQL |
+| Storage | `StorageProvider` | Local FS / S3-compatible |
+| Auth | `AuthProvider` | Internal accounts |
+
+The ingestion core (dedup → thread-link → number → create/append → reopen) is pure logic, unit-tested with fakes — no live IMAP or database required to test it.
+
+## Getting started
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env       # set DATABASE_URL (Neon or any Postgres)
+npx prisma migrate dev     # apply the schema
+npx prisma db seed         # sample data
+npm run dev                # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Core data model
+`Ticket` · `Message` · `Operator` · `MailAccount` · `Contact` · `Label` · `Note` · `Attachment` · `AuditLog` · `Template` · `Settings`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+<sub>Designed and implemented with [Claude Code](https://claude.com/claude-code).</sub>
