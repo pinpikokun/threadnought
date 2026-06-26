@@ -15,11 +15,14 @@
     "@prisma/adapter-neon": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "dotenv": "^17.4.2",
+    "imapflow": "^1.4.3",
+    "mailparser": "^3.9.12",
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@types/mailparser": "^3.4.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
