@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  DISPATCHER
+  MEMBER
+}
+
+enum TicketStatus {
+  UNHANDLED
+  IN_PROGRESS
+  DONE
+}
+
+enum Direction {
+  INBOUND
+  OUTBOUND
+}
+
+enum NoteType {
+  INTERNAL_NOTE
+  EXTERNAL_LOG
+}
+
+enum AuditAction {
+  STATUS_CHANGED
+  ASSIGNEE_CHANGED
+  LABEL_ADDED
+  LABEL_REMOVED
+  REOPENED
+  MERGED
+  SPLIT
+  REPLIED
+}
+
+model Operator {
+  id           String        @id @default(cuid())
+  username     String        @unique
+  displayName  String
+  avatarUrl    String?
+  email        String?
+  passwordHash String
+  role         Role          @default(MEMBER)
+  isActive     Boolean       @default(true)
+  listColumns  Json?
+  accounts     MailAccount[] @relation("OperatorAccounts")
+  assigned     Ticket[]      @relation("TicketAssignee")
+  notes        Note[]
+  audits       AuditLog[]
+  createdAt    DateTime      @default(now())
+}
+
+model MailAccount {
+  id          String     @id @default(cuid())
+  name        String
+  adapterType String     @default("imap_smtp")
+  config      Json
+  casePrefix  String
+  signature   String?
+  operators   Operator[] @relation("OperatorAccounts")
+  tickets     Ticket[]
+  createdAt   DateTime   @default(now())
+}
+
+model Contact {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  company   String?
+  phone     String?
+  tickets   Ticket[]
+  createdAt DateTime @default(now())
+}
+
+model Label {
+  id      String   @id @default(cuid())
+  name    String
+  color   String?
+  tickets Ticket[] @relation("TicketLabels")
+}
+
+model Ticket {
+  id           String       @id @default(cuid())
+  caseNumber   String       @unique
+  token        String       @unique
+  title        String
+  subject      String
+  status       TicketStatus @default(UNHANDLED)
+  dueDate      DateTime?
+  isPinned     Boolean      @default(false)
+  messageCount Int          @default(0)
+  isSpam       Boolean      @default(false)
+  isTrashed    Boolean      @default(false)
+  tokenEnabled Boolean?
+  accountId    String
+  account      MailAccount  @relation(fields: [accountId], references: [id])
+  assigneeId   String?
+  assignee     Operator?    @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  contactId    String?
+  contact      Contact?     @relation(fields: [contactId], references: [id])
+  labels       Label[]      @relation("TicketLabels")
+  messages     Message[]
+  notes        Note[]
+  audits       AuditLog[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Message {
+  id          String       @id @default(cuid())
+  ticketId    String
+  ticket      Ticket       @relation(fields: [ticketId], references: [id])
+  direction   Direction
+  messageId   String       @unique
+  inReplyTo   String?
+  references  String[]
+  fromAddr    String
+  toAddrs     String[]
+  subject     String
+  bodyText    String?
+  bodyHtml    String?
+  rawSource   String?
+  sentAt      DateTime
+  attachments Attachment[]
+  createdAt   DateTime     @default(now())
+}
+
+model Attachment {
+  id          String  @id @default(cuid())
+  messageId   String
+  message     Message @relation(fields: [messageId], references: [id])
+  filename    String
+  contentType String
+  storageKey  String
+  size        Int
+}
+
+model Note {
+  id         String   @id @default(cuid())
+  ticketId   String
+  ticket     Ticket   @relation(fields: [ticketId], references: [id])
+  type       NoteType
+  authorId   String
+  author     Operator @relation(fields: [authorId], references: [id])
+  body       String
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+}
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  ticketId  String
+  ticket    Ticket      @relation(fields: [ticketId], references: [id])
+  actorId   String
+  actor     Operator    @relation(fields: [actorId], references: [id])
+  action    AuditAction
+  fromValue String?
+  toValue   String?
+  createdAt DateTime    @default(now())
+}
+
+model Template {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  accountId String?
+  createdAt DateTime @default(now())
+}
+
+model Settings {
+  id                  Int     @id @default(1)
+  subjectTokenDefault Boolean @default(true)
+  autoCreateContact   Boolean @default(false)
+  agingWarnDays       Int     @default(3)
+  agingDangerDays     Int     @default(7)
+  statusColors        Json?
+}
