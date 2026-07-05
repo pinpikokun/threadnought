@@ -6,6 +6,8 @@ import { decideStatusChange } from "./status";
 import { decideAssigneeChange } from "./assignee";
 import { decideLabelChange } from "./labels";
 import { buildTimeline, type TimelineItem } from "./timeline";
+import { nextCaseNumber } from "@/lib/tickets/numbering";
+import { validateMerge, validateSplit } from "./merge-split";
 
 // audits を AuditLog 行としてまとめて書き込む。
 export async function writeAudits(
@@ -148,4 +150,70 @@ export async function loadTimeline(ticketId: string): Promise<TimelineItem[] | n
       id: a.id, createdAt: a.createdAt, action: a.action, actorName: a.actor.displayName, fromValue: a.fromValue, toValue: a.toValue,
     })),
   });
+}
+
+// 統合：source の全メール・全メモを target に移し、source を空にしてゴミ箱化する。
+export async function mergeTickets(input: {
+  sourceId: string;
+  targetId: string;
+  actor: Actor;
+}): Promise<OpResult> {
+  const v = validateMerge({ sourceId: input.sourceId, targetId: input.targetId });
+  if (!v.ok) return { kind: "invalid", reason: v.reason };
+
+  const [source, target] = await Promise.all([
+    prisma.ticket.findUnique({ where: { id: input.sourceId }, select: { id: true, caseNumber: true, messageCount: true } }),
+    prisma.ticket.findUnique({ where: { id: input.targetId }, select: { id: true } }),
+  ]);
+  if (!source || !target) return { kind: "not_found" };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.message.updateMany({ where: { ticketId: input.sourceId }, data: { ticketId: input.targetId } });
+    await tx.note.updateMany({ where: { ticketId: input.sourceId }, data: { ticketId: input.targetId } });
+    // メッセージ数を実数から再計算（非正規化列の整合を保つ）。
+    const targetCount = await tx.message.count({ where: { ticketId: input.targetId } });
+    await tx.ticket.update({ where: { id: input.targetId }, data: { messageCount: targetCount } });
+    await tx.ticket.update({ where: { id: input.sourceId }, data: { messageCount: 0, isTrashed: true } });
+    await writeAudits(tx, input.targetId, input.actor.operatorId, [{ action: "MERGED", fromValue: source.caseNumber, toValue: input.targetId }]);
+    await writeAudits(tx, input.sourceId, input.actor.operatorId, [{ action: "MERGED", toValue: input.targetId }]);
+  });
+  return { kind: "ok", changed: true };
+}
+
+// 分割：指定メール1通を、同じ窓口の新規チケットへ切り出す。
+export async function splitMessage(input: {
+  ticketId: string;
+  messageId: string;
+  actor: Actor;
+}): Promise<{ kind: "ok"; newTicketId: string; caseNumber: string } | Exclude<OpResult, { kind: "ok" }>> {
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: input.ticketId },
+    select: { id: true, accountId: true, account: { select: { casePrefix: true } }, messages: { select: { id: true, subject: true } } },
+  });
+  if (!ticket) return { kind: "not_found" };
+
+  const v = validateSplit({ ticketMessageIds: ticket.messages.map((m) => m.id), messageId: input.messageId });
+  if (!v.ok) return { kind: "invalid", reason: v.reason };
+
+  const target = ticket.messages.find((m) => m.id === input.messageId)!;
+  // 採番はトランザクション外（Counterのupsert）。件名は分割元メールの件名を引き継ぐ。
+  const caseNumber = await nextCaseNumber(ticket.account.casePrefix);
+
+  const newTicketId = await prisma.$transaction(async (tx) => {
+    const created = await tx.ticket.create({
+      data: {
+        caseNumber, token: caseNumber, title: target.subject, subject: target.subject,
+        accountId: ticket.accountId, status: "UNHANDLED", messageCount: 1,
+      },
+      select: { id: true },
+    });
+    await tx.message.update({ where: { id: input.messageId }, data: { ticketId: created.id } });
+    // 分割元のメッセージ数を実数へ再計算。
+    const srcCount = await tx.message.count({ where: { ticketId: input.ticketId } });
+    await tx.ticket.update({ where: { id: input.ticketId }, data: { messageCount: srcCount } });
+    await writeAudits(tx, input.ticketId, input.actor.operatorId, [{ action: "SPLIT", toValue: caseNumber }]);
+    await writeAudits(tx, created.id, input.actor.operatorId, [{ action: "SPLIT", fromValue: ticket.id }]);
+    return created.id;
+  });
+  return { kind: "ok", newTicketId, caseNumber };
 }
