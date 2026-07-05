@@ -4,21 +4,25 @@ import { sendReply } from "@/lib/mail/reply";
 import { prismaReplyRepository } from "@/lib/mail/reply-repo";
 import { SmtpSender, type SmtpConfig } from "@/lib/mail/adapters/smtp";
 import { renderTemplate } from "@/lib/templates/render";
+import { getCurrentActor } from "@/lib/auth/current";
+import { assertTicketAccess } from "@/lib/auth/access";
 
 export const dynamic = "force-dynamic";
 
-// セキュリティ注記（意図的な将来対応・サイレントな穴にしないため明記）:
-// - 認証は未実装。operatorId・宛先(to/cc/bcc)はリクエストボディを信頼している。
-//   認証/認可（送信者の本人確認・窓口アクセス制御・宛先の妥当性）は Phase 5 の範囲。
-//   公開デプロイ前に必ずゲートすること（未認証だとメール中継・監査(actorId)偽装が可能）。
-// - 送信は at-least-once セマンティクス。SMTP送信成功後に saveOutbound が失敗すると
-//   顧客には届くが記録は残らず、再試行で二重送信し得る。冪等化（アウトボックス方式）は将来課題。
+// 注記: 送信は at-least-once セマンティクス。SMTP送信成功後に saveOutbound が失敗すると
+// 顧客には届くが記録は残らず、再試行で二重送信し得る。冪等化（アウトボックス方式）は将来課題。
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const actor = await getCurrentActor();
+  if (!actor) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const access = await assertTicketAccess(actor, id);
+  if (access === "not_found") return NextResponse.json({ ok: false, error: "ticket not found" }, { status: 404 });
+  if (access === "forbidden") return NextResponse.json({ ok: false, error: "権限がありません" }, { status: 403 });
+
   const body = await req.json().catch(() => null);
-  const { operatorId, bodyText, to, cc, bcc, includeQuote, templateId } = body ?? {};
-  if (!operatorId || (!bodyText && !templateId)) {
-    return NextResponse.json({ ok: false, error: "operatorId と bodyText(またはtemplateId) が必要です" }, { status: 400 });
+  const { bodyText, to, cc, bcc, includeQuote, templateId } = body ?? {};
+  if (!bodyText && !templateId) {
+    return NextResponse.json({ ok: false, error: "bodyText(またはtemplateId) が必要です" }, { status: 400 });
   }
 
   // テンプレ選択時は差し込み展開してから本文に結合
@@ -64,7 +68,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const result = await sendReply(
-    { ticketId: id, operatorId, bodyText: text, to, cc, bcc, includeQuote },
+    { ticketId: id, operatorId: actor.operatorId, bodyText: text, to, cc, bcc, includeQuote },
     { repo: prismaReplyRepository, sender: new SmtpSender(cfg.smtp) },
   );
   if (result.kind === "not_found") {
