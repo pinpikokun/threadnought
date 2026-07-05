@@ -30,7 +30,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         },
       }),
     ]);
-    if (tpl && ticket) {
+    if (!tpl) {
+      return NextResponse.json({ ok: false, error: "テンプレートが見つかりません" }, { status: 404 });
+    }
+    if (ticket) {
       const rendered = renderTemplate(tpl.body, {
         顧客名: ticket.contact?.name ?? ticket.messages[0]?.fromAddr ?? "",
         チケット番号: ticket.caseNumber,
@@ -42,9 +45,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // 窓口の SMTP 設定を取得
   const acc = await prisma.ticket.findUnique({ where: { id }, select: { account: { select: { config: true } } } });
-  const cfg = (acc?.account.config ?? {}) as { smtp?: SmtpConfig };
+  if (!acc) {
+    return NextResponse.json({ ok: false, error: "ticket not found" }, { status: 404 });
+  }
+  const cfg = (acc.account.config ?? {}) as { smtp?: SmtpConfig };
   if (!cfg.smtp?.host) {
     return NextResponse.json({ ok: false, error: "この窓口に SMTP 設定がありません（config.smtp）" }, { status: 400 });
+  }
+
+  if (text.trim() === "") {
+    return NextResponse.json({ ok: false, error: "本文が空です" }, { status: 400 });
   }
 
   const result = await sendReply(
