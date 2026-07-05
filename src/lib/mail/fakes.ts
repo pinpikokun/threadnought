@@ -18,6 +18,7 @@ export function makeEmail(p: Partial<ParsedEmail> & { messageId: string }): Pars
     to: p.to ?? [{ address: "support@example.com" }],
     subject: p.subject ?? "件名",
     date: p.date ?? new Date("2026-06-26T10:00:00Z"),
+    attachments: p.attachments ?? [],
     ...p,
   };
 }

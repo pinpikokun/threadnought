@@ -1,5 +1,14 @@
 export type EmailAddr = { address: string; name?: string };
 
+export type ParsedAttachment = {
+  filename: string;
+  contentType: string;
+  content: Buffer;
+  size: number;
+  contentId?: string;
+  inline: boolean;
+};
+
 export type ParsedEmail = {
   uid: string;            // アダプター内の識別子（markProcessed用）
   messageId: string;      // Message-ID（重複排除キー）
@@ -12,6 +21,7 @@ export type ParsedEmail = {
   html?: string;
   date: Date;
   raw?: string;
+  attachments: ParsedAttachment[];
 };
 
 export type IngestResult =

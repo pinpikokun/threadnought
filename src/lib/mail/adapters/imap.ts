@@ -2,6 +2,7 @@ import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import type { MailReceiver } from "../receiver";
 import type { ParsedEmail } from "../types";
+import { mapParsedAttachments } from "../attachments";
 
 export type ImapConfig = { host: string; port: number; secure: boolean; user: string; pass: string; mailbox?: string };
 
@@ -33,6 +34,7 @@ export class ImapReceiver implements MailReceiver {
           html: typeof p.html === "string" ? p.html : undefined,
           date: p.date ?? new Date(),
           raw: msg.source.toString(),
+          attachments: mapParsedAttachments(p.attachments ?? []),
         });
       }
     } finally {
