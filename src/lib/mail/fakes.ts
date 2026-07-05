@@ -1,5 +1,6 @@
 import type { MailReceiver } from "./receiver";
 import type { ParsedEmail, IngestRepository } from "./types";
+import type { OutgoingEmail, SendResult, MailSender } from "./sender";
 
 export class FakeMailReceiver implements MailReceiver {
   processed: string[] = [];
@@ -39,5 +40,15 @@ export class FakeIngestRepository implements IngestRepository {
     const reopened = t.status === "DONE";
     if (reopened) t.status = "IN_PROGRESS";
     return { reopened };
+  }
+}
+
+export class FakeMailSender implements MailSender {
+  sent: OutgoingEmail[] = [];
+  seq = 0;
+  async send(email: OutgoingEmail): Promise<SendResult> {
+    this.sent.push(email);
+    this.seq++;
+    return { messageId: `<out-${this.seq}@threadnought.local>` };
   }
 }
