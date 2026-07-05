@@ -1,6 +1,7 @@
 import type { MailReceiver } from "./receiver";
 import type { ParsedEmail, IngestRepository } from "./types";
 import type { OutgoingEmail, SendResult, MailSender } from "./sender";
+import type { ReplyRepository, ReplyContext, OutboundSave } from "./reply";
 
 export class FakeMailReceiver implements MailReceiver {
   processed: string[] = [];
@@ -50,5 +51,17 @@ export class FakeMailSender implements MailSender {
     this.sent.push(email);
     this.seq++;
     return { messageId: `<out-${this.seq}@threadnought.local>` };
+  }
+}
+
+export class FakeReplyRepository implements ReplyRepository {
+  saved: OutboundSave[] = [];
+  constructor(private ctx: ReplyContext | null) {}
+  async loadReplyContext(_ticketId: string): Promise<ReplyContext | null> {
+    return this.ctx;
+  }
+  async saveOutbound(input: OutboundSave): Promise<{ messageDbId: string }> {
+    this.saved.push(input);
+    return { messageDbId: `M${this.saved.length}` };
   }
 }

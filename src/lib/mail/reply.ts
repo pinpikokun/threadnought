@@ -1,5 +1,5 @@
 import type { EmailAddr } from "./types";
-import type { OutgoingEmail } from "./sender";
+import type { OutgoingEmail, MailSender } from "./sender";
 import { buildQuoteText, type QuoteSource } from "./quote";
 
 export type ReplyOriginal = {
@@ -52,4 +52,80 @@ export function composeReply(input: ComposeReplyInput): OutgoingEmail {
     inReplyTo: input.original.messageId,
     references: [...input.original.references, input.original.messageId],
   };
+}
+
+export type ReplyContext = {
+  ticket: {
+    id: string;
+    caseNumber: string;
+    subject: string;
+    status: "UNHANDLED" | "IN_PROGRESS" | "DONE";
+    assigneeId: string | null;
+    tokenEnabled: boolean;
+  };
+  from: EmailAddr;      // 窓口の送信元アドレス
+  signature?: string;
+  last: ReplyOriginal;  // 返信対象＝直近の受信メール
+};
+
+export type OutboundSave = {
+  ticketId: string;
+  operatorId: string;
+  outgoing: OutgoingEmail;
+  sentMessageId: string;
+  autoAssign: boolean;   // 未割当なら operatorId を担当に
+  toInProgress: boolean; // UNHANDLED なら IN_PROGRESS に
+};
+
+export interface ReplyRepository {
+  loadReplyContext(ticketId: string): Promise<ReplyContext | null>;
+  saveOutbound(input: OutboundSave): Promise<{ messageDbId: string }>;
+}
+
+export type SendReplyInput = {
+  ticketId: string;
+  operatorId: string;
+  bodyText: string;         // テンプレ展開済みの最終本文
+  to?: EmailAddr[];         // 省略時は元差出人
+  cc?: EmailAddr[];
+  bcc?: EmailAddr[];
+  includeQuote?: boolean;   // 省略時 true
+};
+
+export type SendReplyResult =
+  | { kind: "sent"; ticketId: string; sentMessageId: string; caseNumber: string }
+  | { kind: "not_found" };
+
+export async function sendReply(
+  input: SendReplyInput,
+  deps: { repo: ReplyRepository; sender: MailSender },
+): Promise<SendReplyResult> {
+  const ctx = await deps.repo.loadReplyContext(input.ticketId);
+  if (!ctx) return { kind: "not_found" };
+
+  const outgoing = composeReply({
+    from: ctx.from,
+    to: input.to ?? [ctx.last.from],
+    cc: input.cc,
+    bcc: input.bcc,
+    bodyText: input.bodyText,
+    original: ctx.last,
+    caseNumber: ctx.ticket.caseNumber,
+    tokenEnabled: ctx.ticket.tokenEnabled,
+    signature: ctx.signature,
+    includeQuote: input.includeQuote ?? true,
+  });
+
+  const { messageId } = await deps.sender.send(outgoing);
+
+  await deps.repo.saveOutbound({
+    ticketId: ctx.ticket.id,
+    operatorId: input.operatorId,
+    outgoing,
+    sentMessageId: messageId,
+    autoAssign: ctx.ticket.assigneeId == null,
+    toInProgress: ctx.ticket.status === "UNHANDLED",
+  });
+
+  return { kind: "sent", ticketId: ctx.ticket.id, sentMessageId: messageId, caseNumber: ctx.ticket.caseNumber };
 }
