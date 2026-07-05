@@ -32,6 +32,37 @@ function isActive(current: RawSearchParams, key: string, value: string): boolean
   return Array.isArray(v) ? v.includes(value) : v === value;
 }
 
+// 担当ディメンション（クイックビュー view と 担当 assignee）は排他。
+// parseSearchParams が view を assignee より優先するため、両者が同時にURLに乗ると
+// 表示と実フィルタが食い違う。選択時は view/assignee を一旦落として選んだ分だけ付け直す
+// （同じ選択の再クリックは off）ことで、常に片方だけがアクティブになるようにする。
+function assigneeDimHref(
+  current: RawSearchParams,
+  selKey: "view" | "assignee",
+  selValue: string,
+  selActive: boolean,
+): string {
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(current)) {
+    if (v === undefined || k === "view" || k === "assignee") continue;
+    for (const item of Array.isArray(v) ? v : [v]) params.append(k, item);
+  }
+  if (!selActive) params.append(selKey, selValue);
+  const qs = params.toString();
+  return qs ? `/?${qs}` : "/";
+}
+
+function hasView(current: RawSearchParams): boolean {
+  const v = current.view;
+  return v !== undefined && (Array.isArray(v) ? v.length > 0 : true);
+}
+
+// 個別担当ファセットは、view が効いている間は無効（アクティブにしない）。
+function assigneeFacetActive(current: RawSearchParams, opId: string): boolean {
+  if (hasView(current)) return false;
+  return isActive(current, "assignee", opId);
+}
+
 export default async function Home({
   searchParams,
 }: {
@@ -56,8 +87,8 @@ export default async function Home({
 
         <section style={{ marginBottom: "1rem" }}>
           <h3 style={{ fontSize: 13, color: "#666", margin: "0 0 .25rem" }}>クイックビュー</h3>
-          <FacetLink href={toggleHref(raw, "view", "mine")} active={isActive(raw, "view", "mine")} label="自分の担当" count={facets.quickViews.mine} />
-          <FacetLink href={toggleHref(raw, "view", "unassigned")} active={isActive(raw, "view", "unassigned")} label="未割り当て" count={facets.quickViews.unassigned} />
+          <FacetLink href={assigneeDimHref(raw, "view", "mine", isActive(raw, "view", "mine"))} active={isActive(raw, "view", "mine")} label="自分の担当" count={facets.quickViews.mine} />
+          <FacetLink href={assigneeDimHref(raw, "view", "unassigned", isActive(raw, "view", "unassigned"))} active={isActive(raw, "view", "unassigned")} label="未割り当て" count={facets.quickViews.unassigned} />
         </section>
 
         <section style={{ marginBottom: "1rem" }}>
@@ -70,7 +101,7 @@ export default async function Home({
         <section style={{ marginBottom: "1rem" }}>
           <h3 style={{ fontSize: 13, color: "#666", margin: "0 0 .25rem" }}>担当</h3>
           {facets.assignees.map((a) => (
-            <FacetLink key={a.operatorId} href={toggleHref(raw, "assignee", a.operatorId)} active={isActive(raw, "assignee", a.operatorId)} label={a.name} count={a.count} />
+            <FacetLink key={a.operatorId} href={assigneeDimHref(raw, "assignee", a.operatorId, assigneeFacetActive(raw, a.operatorId))} active={assigneeFacetActive(raw, a.operatorId)} label={a.name} count={a.count} />
           ))}
         </section>
 
@@ -135,7 +166,7 @@ export default async function Home({
                 <td style={{ padding: ".4rem", whiteSpace: "nowrap" }}>{x.caseNumber}</td>
                 <td style={{ padding: ".4rem" }}>{x.title}</td>
                 <td style={{ padding: ".4rem" }}>{t.statusLabel[x.status]}</td>
-                <td style={{ padding: ".4rem" }}>{x.assigneeName ?? "-"}</td>
+                <td style={{ padding: ".4rem" }}>{x.assigneeName ?? "—"}</td>
                 <td style={{ padding: ".4rem" }}>{x.messageCount}</td>
                 <td style={{ padding: ".4rem", whiteSpace: "nowrap" }}>{x.updatedAt.toLocaleString("ja-JP")}</td>
               </tr>
