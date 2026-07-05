@@ -163,7 +163,9 @@ export default async function Home({
           <tbody>
             {tickets.map((x) => (
               <tr key={x.id} style={{ borderBottom: "1px solid #eee" }}>
-                <td style={{ padding: ".4rem", whiteSpace: "nowrap" }}>{x.caseNumber}</td>
+                <td style={{ padding: ".4rem", whiteSpace: "nowrap" }}>
+                  <a href={`/tickets/${x.id}`}>{x.caseNumber}</a>
+                </td>
                 <td style={{ padding: ".4rem" }}>{x.title}</td>
                 <td style={{ padding: ".4rem" }}>{t.statusLabel[x.status]}</td>
                 <td style={{ padding: ".4rem" }}>{x.assigneeName ?? "—"}</td>
