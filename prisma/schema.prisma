@@ -54,6 +54,7 @@ model Operator {
   assigned     Ticket[]      @relation("TicketAssignee")
   notes        Note[]
   audits       AuditLog[]
+  sessions     Session[]
   createdAt    DateTime      @default(now())
 }
 
@@ -186,4 +187,15 @@ model Settings {
 model Counter {
   prefix String @id
   value  Int    @default(0)
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  token      String   @unique
+  operatorId String
+  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([operatorId])
 }
