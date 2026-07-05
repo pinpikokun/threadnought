@@ -141,6 +141,8 @@ model Attachment {
   contentType String
   storageKey  String
   size        Int
+  contentId   String?
+  inline      Boolean @default(false)
 }
 
 model Note {
