@@ -7,4 +7,16 @@ export const t = {
   messages: "メッセージ",
   updatedAt: "最終更新",
   statusLabel: { UNHANDLED: "未対応", IN_PROGRESS: "対応中", DONE: "完了" },
+  directionLabel: { INBOUND: "受信", OUTBOUND: "送信" },
+  noteTypeLabel: { INTERNAL_NOTE: "社内メモ", EXTERNAL_LOG: "外部ログ" },
+  auditLabel: {
+    STATUS_CHANGED: "ステータスを変更",
+    ASSIGNEE_CHANGED: "担当を変更",
+    LABEL_ADDED: "ラベルを追加",
+    LABEL_REMOVED: "ラベルを削除",
+    REOPENED: "再オープン",
+    MERGED: "統合",
+    SPLIT: "分割",
+    REPLIED: "返信",
+  },
 } as const;
