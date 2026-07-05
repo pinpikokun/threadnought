@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ImapReceiver, type ImapConfig } from "@/lib/mail/adapters/imap";
 import { ingestNew } from "@/lib/mail/ingest";
@@ -6,7 +6,15 @@ import { prismaIngestRepository } from "@/lib/mail/ingest-repo";
 
 export const dynamic = "force-dynamic";
 
-export async function POST() {
+// このエンドポイントは人間のセッションではなく、常駐ワーカー/Cronなどのマシンから呼ばれる。
+// WORKER_TOKEN（env）を x-worker-token ヘッダで照合する。未設定なら常に拒否（誤って無防備に開かない）。
+export async function POST(req: NextRequest) {
+  const configured = process.env.WORKER_TOKEN;
+  const provided = req.headers.get("x-worker-token");
+  if (!configured || provided !== configured) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+
   const accounts = await prisma.mailAccount.findMany();
   const summary: Record<string, number> = { created: 0, appended: 0, skipped_duplicate: 0 };
   for (const acc of accounts) {
