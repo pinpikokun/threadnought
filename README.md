@@ -9,7 +9,8 @@
 - ✅ **Phase 2 · Mail ingestion** — IMAP receive, thread-linking, case numbering, de-duplication, auto-reopen (validated against a real inbox)
 - ✅ **Phase 3 · Replies** — SMTP send, reply composition (Re:/case-token/signature/quote), templates, auto-status/auto-assignee, audit trail, outbound persistence (real-DB integration test)
 - ✅ **Phase 4 · Operations** — status/assignee/label changes, internal notes & external logs, ticket merge/split, unified timeline, full audit trail
-- ⏭️ **Next** — Phase 5 auth · Phase 6 search / attachments / notifications / UI polish (rich editor, thread modal, quote-collapse on display)
+- ✅ **Phase 5 · Auth** — internal accounts (username+password) behind an `AuthProvider` interface, DB-backed sessions, login/logout, route protection, and window-scoped access control (all actions now derive the actor from the session, not the request body)
+- ⏭️ **Next** — Phase 6 search / attachments / notifications / UI polish (rich editor, thread modal, quote-collapse on display, inline editing, title/pin/dueDate editing)
 
 ## Tech stack
 - **Next.js 16** (App Router) · **TypeScript**
@@ -37,6 +38,13 @@ cp .env.example .env       # set DATABASE_URL (Neon or any Postgres)
 npx prisma migrate dev     # apply the schema
 npx prisma db seed         # sample data
 npm run dev                # http://localhost:3000
+```
+
+After `npx prisma db seed`, log in at `/login` with the seeded admin account **`tanaka` / `password`** (change it before any real use).
+
+The mail-fetch endpoint is machine-only: set `WORKER_TOKEN` in `.env` and call it with that header:
+```bash
+curl -X POST http://localhost:3000/api/mail/fetch -H "x-worker-token: $WORKER_TOKEN"
 ```
 
 ## Core data model
