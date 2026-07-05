@@ -11,6 +11,29 @@ export type TicketListItem = {
   updatedAt: Date;
 };
 
+// listTickets / searchTickets 共通の行→表示アイテム変換（DRY）
+export type TicketRowForList = {
+  id: string;
+  caseNumber: string;
+  title: string;
+  status: TicketStatus;
+  assignee: { displayName: string } | null;
+  messageCount: number;
+  updatedAt: Date;
+};
+
+export function toTicketListItem(r: TicketRowForList): TicketListItem {
+  return {
+    id: r.id,
+    caseNumber: r.caseNumber,
+    title: r.title,
+    status: r.status,
+    assigneeName: r.assignee?.displayName ?? null,
+    messageCount: r.messageCount,
+    updatedAt: r.updatedAt,
+  };
+}
+
 export async function listTickets(actor: { role: Role; accountIds: string[] }): Promise<TicketListItem[]> {
   const rows = await prisma.ticket.findMany({
     where: {
@@ -21,13 +44,5 @@ export async function listTickets(actor: { role: Role; accountIds: string[] }): 
     include: { assignee: true },
     orderBy: { updatedAt: "desc" },
   });
-  return rows.map((r) => ({
-    id: r.id,
-    caseNumber: r.caseNumber,
-    title: r.title,
-    status: r.status,
-    assigneeName: r.assignee?.displayName ?? null,
-    messageCount: r.messageCount,
-    updatedAt: r.updatedAt,
-  }));
+  return rows.map(toTicketListItem);
 }
