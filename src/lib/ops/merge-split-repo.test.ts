@@ -7,7 +7,6 @@ const PREFIX = "MS";
 let accountId = "";
 let adminId = "";
 let admin: Actor;
-const created: string[] = []; // 後始末対象のチケットid
 
 async function makeTicket(caseNumber: string, msgs: { messageId: string; subject: string }[]) {
   const t = await prisma.ticket.create({
@@ -22,7 +21,6 @@ async function makeTicket(caseNumber: string, msgs: { messageId: string; subject
     },
     select: { id: true },
   });
-  created.push(t.id);
   return t.id;
 }
 
@@ -34,7 +32,7 @@ beforeAll(async () => {
   admin = { operatorId: adminId, role: "ADMIN" };
   // 採番カウンタを固定フィクスチャ番号(MS-000001〜000005)より先の値へ退避しておく。
   // 未シードだと nextCaseNumber が MS-000001 から発番し、手動採番のチケットと衝突するため。
-  await prisma.counter.create({ data: { prefix: PREFIX, value: 100 } });
+  await prisma.counter.upsert({ where: { prefix: PREFIX }, create: { prefix: PREFIX, value: 100 }, update: { value: 100 } });
 });
 
 afterAll(async () => {
@@ -85,7 +83,6 @@ describe("splitMessage（分割）", () => {
     const res = await splitMessage({ ticketId: t, messageId: split!.id, actor: admin });
     expect(res.kind).toBe("ok");
     if (res.kind !== "ok") return;
-    created.push(res.newTicketId);
 
     const newTicket = await prisma.ticket.findUnique({ where: { id: res.newTicketId }, select: { messageCount: true, subject: true } });
     expect(newTicket!.messageCount).toBe(1);
