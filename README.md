@@ -7,7 +7,8 @@
 ## Status — work in progress
 - ✅ **Phase 1 · Foundation** — data model, database, ticket list
 - ✅ **Phase 2 · Mail ingestion** — IMAP receive, thread-linking, case numbering, de-duplication, auto-reopen (validated against a real inbox)
-- ⏭️ **Next** — Phase 3 replies (SMTP) · Phase 4 operations · Phase 5 auth · Phase 6 search / attachments / notifications / UI polish
+- ✅ **Phase 3 · Replies** — SMTP send, reply composition (Re:/case-token/signature/quote), templates, auto-status/auto-assignee, audit trail, outbound persistence (real-DB integration test)
+- ⏭️ **Next** — Phase 4 operations · Phase 5 auth · Phase 6 search / attachments / notifications / UI polish (rich editor, thread modal, quote-collapse on display)
 
 ## Tech stack
 - **Next.js 16** (App Router) · **TypeScript**
@@ -21,7 +22,7 @@ Ports & adapters throughout, so the core logic never depends on a concrete servi
 | Concern | Port (interface) | Default adapter |
 |---|---|---|
 | Receive mail | `MailReceiver` | IMAP |
-| Send mail | `MailSender` | SMTP *(Phase 3)* |
+| Send mail | `MailSender` | SMTP (`nodemailer`) |
 | Search | `SearchProvider` | PostgreSQL |
 | Storage | `StorageProvider` | Local FS / S3-compatible |
 | Auth | `AuthProvider` | Internal accounts |
