@@ -1,10 +1,14 @@
+import { redirect } from "next/navigation";
+import { getCurrentActor } from "@/lib/auth/current";
 import { listTickets } from "@/lib/tickets";
 import { t } from "@/lib/i18n/ja";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const tickets = await listTickets();
+  const actor = await getCurrentActor();
+  if (!actor) redirect("/login");
+  const tickets = await listTickets(actor);
   return (
     <main style={{ padding: 24 }}>
       <h1>{t.ticketList}</h1>

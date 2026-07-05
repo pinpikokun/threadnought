@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { TicketStatus } from "../generated/prisma/client";
+import type { TicketStatus, Role } from "../generated/prisma/client";
 
 export type TicketListItem = {
   id: string;
@@ -11,9 +11,13 @@ export type TicketListItem = {
   updatedAt: Date;
 };
 
-export async function listTickets(): Promise<TicketListItem[]> {
+export async function listTickets(actor: { role: Role; accountIds: string[] }): Promise<TicketListItem[]> {
   const rows = await prisma.ticket.findMany({
-    where: { isTrashed: false },
+    where: {
+      isTrashed: false,
+      // ADMINは全窓口。それ以外は自分がアクセスできる窓口のチケットのみ。
+      ...(actor.role === "ADMIN" ? {} : { accountId: { in: actor.accountIds } }),
+    },
     include: { assignee: true },
     orderBy: { updatedAt: "desc" },
   });
