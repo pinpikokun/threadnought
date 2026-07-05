@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 const provider = new InternalAuthProvider();
 
-// 注記: ブルートフォース対策のレート制限は将来課題(小規模内部運用のため v1 では未実装)。
+// 注記: ブルートフォース対策のレート制限は将来課題（小規模内部運用のため v1 では未実装）。
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const { username, password } = (body ?? {}) as { username?: string; password?: string };
