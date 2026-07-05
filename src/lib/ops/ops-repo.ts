@@ -132,7 +132,7 @@ export async function loadTimeline(ticketId: string): Promise<TimelineItem[] | n
   const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
     select: {
-      messages: { select: { id: true, sentAt: true, direction: true, fromAddr: true, subject: true, bodyText: true } },
+      messages: { select: { id: true, sentAt: true, direction: true, fromAddr: true, subject: true, bodyText: true, bodyHtml: true, attachments: { select: { id: true, filename: true, contentType: true, size: true, inline: true } } } },
       notes: { select: { id: true, occurredAt: true, type: true, body: true, author: { select: { displayName: true } } } },
       audits: { select: { id: true, createdAt: true, action: true, fromValue: true, toValue: true, actor: { select: { displayName: true } } } },
     },
@@ -141,7 +141,7 @@ export async function loadTimeline(ticketId: string): Promise<TimelineItem[] | n
 
   return buildTimeline({
     messages: ticket.messages.map((m) => ({
-      id: m.id, sentAt: m.sentAt, direction: m.direction, fromAddr: m.fromAddr, subject: m.subject, bodyText: m.bodyText,
+      id: m.id, sentAt: m.sentAt, direction: m.direction, fromAddr: m.fromAddr, subject: m.subject, bodyText: m.bodyText, bodyHtml: m.bodyHtml, attachments: m.attachments,
     })),
     notes: ticket.notes.map((n) => ({
       id: n.id, occurredAt: n.occurredAt, type: n.type, authorName: n.author.displayName, body: n.body,

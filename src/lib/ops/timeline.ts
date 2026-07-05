@@ -1,5 +1,13 @@
 import type { Direction, NoteType, AuditAction } from "@/generated/prisma/client";
 
+export type AttachmentMeta = {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  inline: boolean;
+};
+
 export type TimelineMessageInput = {
   id: string;
   sentAt: Date;
@@ -7,6 +15,8 @@ export type TimelineMessageInput = {
   fromAddr: string;
   subject: string;
   bodyText: string | null;
+  bodyHtml: string | null;
+  attachments: AttachmentMeta[];
 };
 
 export type TimelineNoteInput = {
@@ -27,7 +37,7 @@ export type TimelineAuditInput = {
 };
 
 export type TimelineItem =
-  | { kind: "message"; id: string; at: Date; direction: Direction; fromAddr: string; subject: string; bodyText: string | null }
+  | { kind: "message"; id: string; at: Date; direction: Direction; fromAddr: string; subject: string; bodyText: string | null; bodyHtml: string | null; attachments: AttachmentMeta[] }
   | { kind: "note"; id: string; at: Date; noteType: NoteType; authorName: string; body: string }
   | { kind: "audit"; id: string; at: Date; action: AuditAction; actorName: string; fromValue: string | null; toValue: string | null };
 
@@ -41,7 +51,7 @@ export function buildTimeline(input: {
 }): TimelineItem[] {
   const items: TimelineItem[] = [
     ...input.messages.map((m): TimelineItem => ({
-      kind: "message", id: m.id, at: m.sentAt, direction: m.direction, fromAddr: m.fromAddr, subject: m.subject, bodyText: m.bodyText,
+      kind: "message", id: m.id, at: m.sentAt, direction: m.direction, fromAddr: m.fromAddr, subject: m.subject, bodyText: m.bodyText, bodyHtml: m.bodyHtml, attachments: m.attachments,
     })),
     ...input.notes.map((n): TimelineItem => ({
       kind: "note", id: n.id, at: n.occurredAt, noteType: n.type, authorName: n.authorName, body: n.body,
