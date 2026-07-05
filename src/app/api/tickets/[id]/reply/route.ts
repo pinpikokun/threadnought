@@ -7,6 +7,12 @@ import { renderTemplate } from "@/lib/templates/render";
 
 export const dynamic = "force-dynamic";
 
+// セキュリティ注記（意図的な将来対応・サイレントな穴にしないため明記）:
+// - 認証は未実装。operatorId・宛先(to/cc/bcc)はリクエストボディを信頼している。
+//   認証/認可（送信者の本人確認・窓口アクセス制御・宛先の妥当性）は Phase 5 の範囲。
+//   公開デプロイ前に必ずゲートすること（未認証だとメール中継・監査(actorId)偽装が可能）。
+// - 送信は at-least-once セマンティクス。SMTP送信成功後に saveOutbound が失敗すると
+//   顧客には届くが記録は残らず、再試行で二重送信し得る。冪等化（アウトボックス方式）は将来課題。
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await req.json().catch(() => null);
