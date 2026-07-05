@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { pgTrgmSearchProvider } from "./pg-adapter";
 
-const PREFIX = "SRCH";
+const PREFIX = "SXADP";
 let accountA = "";
 let accountB = "";
 let ticketApple = "";

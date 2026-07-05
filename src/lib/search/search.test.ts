@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { searchTickets } from "./search";
 import type { SearchActor } from "./search";
 
-const PREFIX = "SRCHO";
+const PREFIX = "SXORC";
 let accountA = "";
 let accountB = "";
 let alice = "";

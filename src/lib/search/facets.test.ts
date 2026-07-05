@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getFacetCounts } from "./search";
 import type { SearchActor } from "./search";
 
-const PREFIX = "SRCHF";
+const PREFIX = "SXFCT";
 let accountA = "";
 let alice = "";
 let labelUrgent = "";
