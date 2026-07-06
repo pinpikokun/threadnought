@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { parseAddressList } from "@/lib/mail/address-input";
+import { parseAddressList, isLikelyEmail } from "@/lib/mail/address-input";
 
 const inputStyle: CSSProperties = { width: "100%", padding: ".4rem", fontSize: 13, boxSizing: "border-box" };
 
@@ -36,6 +36,11 @@ export function ReplyForm({ ticketId, defaultTo }: { ticketId: string; defaultTo
     const toList = parseAddressList(to);
     const ccList = parseAddressList(cc);
     const bccList = parseAddressList(bcc);
+    const bad = [...toList, ...ccList, ...bccList].find((a) => !isLikelyEmail(a.address));
+    if (bad) {
+      setError(`メールアドレスの形式が正しくありません: ${bad.address}`);
+      return;
+    }
     if (toList.length > 0) payload.to = toList;
     if (ccList.length > 0) payload.cc = ccList;
     if (bccList.length > 0) payload.bcc = bccList;

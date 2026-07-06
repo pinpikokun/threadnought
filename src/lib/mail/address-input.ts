@@ -1,10 +1,10 @@
 import type { EmailAddr } from "./types";
 
-// カンマと改行で区切られた宛先入力を EmailAddr[] に整形する。
+// カンマ・セミコロン・改行で区切られた宛先入力を EmailAddr[] に整形する。
 // 表示名付き記法は本増分では扱わず、素のアドレス文字列をそのまま address に入れる。
 export function parseAddressList(raw: string): EmailAddr[] {
   return raw
-    .split(/[,\n]/)
+    .split(/[,;\n]/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
     .map((address) => ({ address }));

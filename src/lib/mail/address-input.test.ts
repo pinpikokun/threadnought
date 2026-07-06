@@ -8,6 +8,9 @@ describe("parseAddressList", () => {
   it("改行区切りも扱い、空要素を落とす", () => {
     expect(parseAddressList("a@x.com\n\n b@y.com \n")).toEqual([{ address: "a@x.com" }, { address: "b@y.com" }]);
   });
+  it("セミコロン区切りも扱う", () => {
+    expect(parseAddressList("a@x.com; b@y.com")).toEqual([{ address: "a@x.com" }, { address: "b@y.com" }]);
+  });
   it("空白のみは空配列", () => {
     expect(parseAddressList("   ")).toEqual([]);
   });
