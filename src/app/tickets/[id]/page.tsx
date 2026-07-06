@@ -5,6 +5,7 @@ import { loadTicketDetail } from "@/lib/ops/ticket-detail";
 import { t } from "@/lib/i18n/ja";
 import { StatusBadge, TimelineView } from "./parts";
 import { ReplyForm } from "./reply-form";
+import { StatusControl, AddNoteForm } from "./ticket-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,11 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
           ))}
         </div>
       </header>
+      <div style={{ margin: "0 0 1rem" }}>
+        <StatusControl ticketId={header.id} current={header.status} />
+      </div>
       <TimelineView items={timeline} />
+      <AddNoteForm ticketId={header.id} />
       <ReplyForm ticketId={header.id} defaultTo={defaultTo} />
     </main>
   );
