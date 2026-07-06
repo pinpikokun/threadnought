@@ -4,6 +4,7 @@ import { assertTicketAccess } from "@/lib/auth/access";
 import { loadTicketDetail } from "@/lib/ops/ticket-detail";
 import { t } from "@/lib/i18n/ja";
 import { StatusBadge, TimelineView } from "./parts";
+import { ReplyForm } from "./reply-form";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,17 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
   if (!detail) notFound();
 
   const { header, timeline } = detail;
+
+  // 直近の受信(INBOUND)差出人を返信先の初期値にする。
+  let defaultTo = "";
+  for (let i = timeline.length - 1; i >= 0; i--) {
+    const it = timeline[i];
+    if (it.kind === "message" && it.direction === "INBOUND") {
+      defaultTo = it.fromAddr;
+      break;
+    }
+  }
+
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: "1rem" }}>
       <a href="/" style={{ fontSize: 13 }}>← 一覧へ戻る</a>
@@ -36,6 +48,7 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
         </div>
       </header>
       <TimelineView items={timeline} />
+      <ReplyForm ticketId={header.id} defaultTo={defaultTo} />
     </main>
   );
 }
