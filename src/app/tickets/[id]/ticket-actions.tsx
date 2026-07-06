@@ -103,12 +103,12 @@ export function AddNoteForm({ ticketId }: { ticketId: string }) {
     <form onSubmit={onSubmit} style={{ borderTop: "1px solid #ddd", marginTop: "1.5rem", paddingTop: "1rem" }}>
       <h2 style={{ fontSize: 15, margin: "0 0 .5rem" }}>メモ / 対応ログを追加</h2>
       <label style={{ display: "block", fontSize: 12, color: "#555" }}>種別</label>
-      <select value={type} onChange={(e) => setType(e.target.value as NoteType)} style={{ fontSize: 13, padding: ".2rem .4rem", marginBottom: ".5rem" }}>
+      <select value={type} disabled={submitting} onChange={(e) => setType(e.target.value as NoteType)} style={{ fontSize: 13, padding: ".2rem .4rem", marginBottom: ".5rem" }}>
         {NOTE_ORDER.map((n) => (
           <option key={n} value={n}>{t.noteTypeLabel[n]}</option>
         ))}
       </select>
-      <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={4} style={{ ...inputStyle, resize: "vertical" }} placeholder="社内向けのメモや、電話などメール外の対応を記録" />
+      <textarea value={body} disabled={submitting} onChange={(e) => setBody(e.target.value)} rows={4} style={{ ...inputStyle, resize: "vertical" }} placeholder="社内向けのメモや、電話などメール外の対応を記録" />
       {error && <p style={{ color: "#dc2626", fontSize: 13, margin: ".5rem 0 0" }}>{error}</p>}
       {okMsg && <p style={{ color: "#16a34a", fontSize: 13, margin: ".5rem 0 0" }}>{okMsg}</p>}
       <div style={{ marginTop: ".5rem" }}>
