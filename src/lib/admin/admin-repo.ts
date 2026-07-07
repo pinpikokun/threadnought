@@ -1,7 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/generated/prisma/client";
 import { hashPassword } from "@/lib/auth/password";
-import { validateNewOperator, validatePassword, isValidRole } from "./validation";
+import {
+  validateNewOperator,
+  validatePassword,
+  isValidRole,
+  validateLabelName,
+  normalizeColor,
+} from "./validation";
 
 // ADMIN設定: オペレータの一覧/作成/更新。呼び出し側(ルート/ページ)で ADMIN 限定を担保する。
 
@@ -125,5 +131,53 @@ export async function resetOperatorPassword(
   if (!existing) return { kind: "not_found" };
   const passwordHash = await hashPassword(password);
   await prisma.operator.update({ where: { id }, data: { passwordHash } });
+  return { kind: "ok", value: undefined };
+}
+
+// ===== ラベル管理 =====
+
+export type LabelRow = { id: string; name: string; color: string };
+
+// 全ラベルを名前昇順で。color は表示用に "" へ正規化。
+export async function listLabels(): Promise<LabelRow[]> {
+  const labels = await prisma.label.findMany({
+    select: { id: true, name: true, color: true },
+    orderBy: { name: "asc" },
+  });
+  return labels.map((l) => ({ id: l.id, name: l.name, color: l.color ?? "" }));
+}
+
+export async function createLabel(input: { name: string; color?: unknown }): Promise<AdminResult<{ id: string }>> {
+  const v = validateLabelName(input.name ?? "");
+  if (!v.ok) return { kind: "invalid", reason: v.reason };
+  const created = await prisma.label.create({
+    data: { name: input.name.trim(), color: normalizeColor(input.color) },
+    select: { id: true },
+  });
+  return { kind: "ok", value: { id: created.id } };
+}
+
+export async function updateLabel(id: string, input: { name?: string; color?: unknown }): Promise<AdminResult> {
+  const existing = await prisma.label.findUnique({ where: { id }, select: { id: true } });
+  if (!existing) return { kind: "not_found" };
+  if (input.name !== undefined) {
+    const v = validateLabelName(input.name);
+    if (!v.ok) return { kind: "invalid", reason: v.reason };
+  }
+  await prisma.label.update({
+    where: { id },
+    data: {
+      name: input.name !== undefined ? input.name.trim() : undefined,
+      color: input.color !== undefined ? normalizeColor(input.color) : undefined,
+    },
+  });
+  return { kind: "ok", value: undefined };
+}
+
+// ラベル削除。付与済みチケットとの関連(暗黙M2M)は Prisma が自動で解消する。
+export async function deleteLabel(id: string): Promise<AdminResult> {
+  const existing = await prisma.label.findUnique({ where: { id }, select: { id: true } });
+  if (!existing) return { kind: "not_found" };
+  await prisma.label.delete({ where: { id } });
   return { kind: "ok", value: undefined };
 }

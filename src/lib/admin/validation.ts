@@ -45,3 +45,20 @@ export function validatePassword(password: string): ValidationResult {
   }
   return { ok: true };
 }
+
+export const MAX_LABEL_NAME_LENGTH = 40;
+
+// ラベル名の検証。空不可・長さ上限のみ(色は任意で緩く扱う)。
+export function validateLabelName(name: string): ValidationResult {
+  const trimmed = name?.trim() ?? "";
+  if (trimmed === "") return { ok: false, reason: "ラベル名を入力してください" };
+  if (trimmed.length > MAX_LABEL_NAME_LENGTH) return { ok: false, reason: "ラベル名が長すぎます" };
+  return { ok: true };
+}
+
+// 色の正規化: 空文字/未指定は null、それ以外はそのまま(UIは <input type=color> でhex供給)。
+export function normalizeColor(color: unknown): string | null {
+  if (typeof color !== "string") return null;
+  const trimmed = color.trim();
+  return trimmed === "" ? null : trimmed;
+}

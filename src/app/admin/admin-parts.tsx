@@ -4,7 +4,7 @@ import { useState, type CSSProperties, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { t } from "@/lib/i18n/ja";
 import type { Role } from "@/generated/prisma/client";
-import type { OperatorRow, AccountRow } from "@/lib/admin/admin-repo";
+import type { OperatorRow, AccountRow, LabelRow } from "@/lib/admin/admin-repo";
 
 const ROLES: Role[] = ["ADMIN", "DISPATCHER", "MEMBER"];
 const inputStyle: CSSProperties = { padding: ".35rem .5rem", fontSize: 13, boxSizing: "border-box" };
@@ -203,6 +203,89 @@ export function OperatorRowEditor({ op, accounts }: { op: OperatorRow; accounts:
       </div>
       {error && <span style={errStyle}>{error}</span>}
       {okMsg && <span style={okStyle}>{okMsg}</span>}
+    </div>
+  );
+}
+
+// ラベル管理: 作成 + 各ラベルの改名/改色/削除。
+export function LabelManager({ labels }: { labels: LabelRow[] }) {
+  const router = useRouter();
+  const [newName, setNewName] = useState("");
+  const [newColor, setNewColor] = useState("#9ca3af");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function call(url: string, method: "POST" | "DELETE", payload?: object): Promise<boolean> {
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: payload ? { "content-type": "application/json" } : undefined,
+        body: payload ? JSON.stringify(payload) : undefined,
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        setError(data?.error ?? "操作に失敗しました");
+        return false;
+      }
+      router.refresh();
+      return true;
+    } catch {
+      setError("操作中にエラーが発生しました");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onCreate(e: FormEvent) {
+    e.preventDefault();
+    if (await call("/api/admin/labels", "POST", { name: newName, color: newColor })) {
+      setNewName("");
+      setNewColor("#9ca3af");
+    }
+  }
+
+  return (
+    <div>
+      <form onSubmit={onCreate} style={{ display: "flex", gap: ".5rem", alignItems: "center", flexWrap: "wrap", marginBottom: ".75rem" }}>
+        <input value={newName} disabled={busy} onChange={(e) => setNewName(e.target.value)} placeholder="ラベル名" style={{ ...inputStyle, minWidth: 160 }} />
+        <input type="color" value={newColor} disabled={busy} onChange={(e) => setNewColor(e.target.value)} title="色" style={{ width: 40, height: 30, padding: 0, border: "1px solid #d1d5db", borderRadius: 4 }} />
+        <button type="submit" disabled={busy || newName.trim() === ""} style={btnStyle(busy || newName.trim() === "", true)}>ラベルを追加</button>
+      </form>
+      {error && <p style={{ ...errStyle, margin: "0 0 .5rem" }}>{error}</p>}
+      <div style={{ display: "flex", flexDirection: "column", gap: ".4rem" }}>
+        {labels.map((l) => (
+          <LabelRowEditor key={l.id} label={l} busy={busy} onSave={(name, color) => call(`/api/admin/labels/${l.id}`, "POST", { name, color })} onDelete={() => call(`/api/admin/labels/${l.id}`, "DELETE")} />
+        ))}
+        {labels.length === 0 && <span style={{ fontSize: 12, color: "#999" }}>ラベルはまだありません</span>}
+      </div>
+    </div>
+  );
+}
+
+function LabelRowEditor({
+  label,
+  busy,
+  onSave,
+  onDelete,
+}: {
+  label: LabelRow;
+  busy: boolean;
+  onSave: (name: string, color: string) => void;
+  onDelete: () => void;
+}) {
+  const [name, setName] = useState(label.name);
+  const [color, setColor] = useState(label.color || "#9ca3af");
+
+  return (
+    <div style={{ display: "flex", gap: ".5rem", alignItems: "center", flexWrap: "wrap" }}>
+      <span style={{ width: 14, height: 14, borderRadius: 3, background: label.color || "#9ca3af", display: "inline-block" }} />
+      <input value={name} disabled={busy} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, minWidth: 160 }} />
+      <input type="color" value={color} disabled={busy} onChange={(e) => setColor(e.target.value)} title="色" style={{ width: 40, height: 30, padding: 0, border: "1px solid #d1d5db", borderRadius: 4 }} />
+      <button type="button" disabled={busy || name.trim() === ""} onClick={() => onSave(name, color)} style={btnStyle(busy || name.trim() === "")}>保存</button>
+      <button type="button" disabled={busy} onClick={() => { if (window.confirm(`ラベル「${label.name}」を削除します。よろしいですか？`)) onDelete(); }} style={{ ...btnStyle(busy), color: "#dc2626", borderColor: "#fca5a5" }}>削除</button>
     </div>
   );
 }

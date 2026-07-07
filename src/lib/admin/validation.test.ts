@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateNewOperator, validatePassword, isValidRole } from "./validation";
+import { validateNewOperator, validatePassword, isValidRole, validateLabelName, normalizeColor } from "./validation";
 
 describe("isValidRole", () => {
   it("ADMIN/DISPATCHER/MEMBER を受理し、それ以外を拒否", () => {
@@ -45,5 +45,23 @@ describe("validatePassword", () => {
   it("8文字以上は ok、未満は invalid", () => {
     expect(validatePassword("password").ok).toBe(true);
     expect(validatePassword("short").ok).toBe(false);
+  });
+});
+
+describe("validateLabelName", () => {
+  it("非空は ok、空白のみ/長すぎは invalid", () => {
+    expect(validateLabelName("緊急").ok).toBe(true);
+    expect(validateLabelName("   ").ok).toBe(false);
+    expect(validateLabelName("あ".repeat(41)).ok).toBe(false);
+  });
+});
+
+describe("normalizeColor", () => {
+  it("空文字/非文字列は null、hex はそのまま", () => {
+    expect(normalizeColor("#ff0000")).toBe("#ff0000");
+    expect(normalizeColor("  ")).toBeNull();
+    expect(normalizeColor("")).toBeNull();
+    expect(normalizeColor(undefined)).toBeNull();
+    expect(normalizeColor(123)).toBeNull();
   });
 });

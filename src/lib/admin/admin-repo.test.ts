@@ -7,6 +7,10 @@ import {
   createOperator,
   updateOperator,
   resetOperatorPassword,
+  listLabels,
+  createLabel,
+  updateLabel,
+  deleteLabel,
 } from "./admin-repo";
 
 // 非重複PREFIX(既存 LKUP/MGCND/NUMT/OP/MS/AUTH/SESS/TLST/SX*/ADMOP と前方一致しない)。
@@ -24,6 +28,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await prisma.operator.deleteMany({ where: { username: { contains: PREFIX } } });
   await prisma.mailAccount.deleteMany({ where: { casePrefix: { startsWith: PREFIX } } });
+  await prisma.label.deleteMany({ where: { name: { startsWith: PREFIX } } });
   await prisma.$disconnect();
 });
 
@@ -120,5 +125,45 @@ describe("listAccounts", () => {
     const prefixes = accs.map((a) => a.casePrefix);
     expect(prefixes).toContain(`${PREFIX}A`);
     expect(prefixes).toContain(`${PREFIX}B`);
+  });
+});
+
+describe("ラベルCRUD", () => {
+  it("作成→一覧に現れ、色が正規化される", async () => {
+    const res = await createLabel({ name: `${PREFIX}-緊急`, color: "#ff0000" });
+    expect(res.kind).toBe("ok");
+    const empty = await createLabel({ name: `${PREFIX}-通常`, color: "" });
+    expect(empty.kind).toBe("ok");
+
+    const labels = await listLabels();
+    const urgent = labels.find((l) => l.name === `${PREFIX}-緊急`);
+    const normal = labels.find((l) => l.name === `${PREFIX}-通常`);
+    expect(urgent!.color).toBe("#ff0000");
+    expect(normal!.color).toBe(""); // null → "" 正規化
+  });
+
+  it("名前が空なら invalid で作成されない", async () => {
+    const res = await createLabel({ name: "   " });
+    expect(res.kind).toBe("invalid");
+  });
+
+  it("更新(改名・改色)できる", async () => {
+    const created = await createLabel({ name: `${PREFIX}-old`, color: "#111111" });
+    const id = (created as { kind: "ok"; value: { id: string } }).value.id;
+    const res = await updateLabel(id, { name: `${PREFIX}-new`, color: "#222222" });
+    expect(res.kind).toBe("ok");
+    const labels = await listLabels();
+    const mine = labels.find((l) => l.id === id)!;
+    expect(mine.name).toBe(`${PREFIX}-new`);
+    expect(mine.color).toBe("#222222");
+  });
+
+  it("削除できる。存在しない id は not_found", async () => {
+    const created = await createLabel({ name: `${PREFIX}-del` });
+    const id = (created as { kind: "ok"; value: { id: string } }).value.id;
+    expect((await deleteLabel(id)).kind).toBe("ok");
+    const labels = await listLabels();
+    expect(labels.find((l) => l.id === id)).toBeUndefined();
+    expect((await deleteLabel("nonexistent-admop-label")).kind).toBe("not_found");
   });
 });
