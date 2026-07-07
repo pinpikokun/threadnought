@@ -44,6 +44,18 @@ enum AuditAction {
   DUE_DATE_CHANGED
 }
 
+// ADMIN設定操作(オペレータ/ラベル/窓口)の監査アクション。チケット監査(AuditAction)とは別系統。
+enum AdminAuditAction {
+  OPERATOR_CREATED
+  OPERATOR_UPDATED
+  OPERATOR_PASSWORD_RESET
+  LABEL_CREATED
+  LABEL_UPDATED
+  LABEL_DELETED
+  ACCOUNT_CREATED
+  ACCOUNT_UPDATED
+}
+
 model Operator {
   id           String        @id @default(cuid())
   username     String        @unique
@@ -58,6 +70,7 @@ model Operator {
   assigned     Ticket[]      @relation("TicketAssignee")
   notes        Note[]
   audits       AuditLog[]
+  adminAudits  AdminAuditLog[]
   sessions     Session[]
   pushSubscriptions PushSubscription[]
   createdAt    DateTime      @default(now())
@@ -185,6 +198,22 @@ model AuditLog {
   fromValue String?
   toValue   String?
   createdAt DateTime    @default(now())
+}
+
+// ADMIN設定操作の監査ログ。チケットに紐付かないため AuditLog とは分離した専用テーブル。
+// targetType/targetId で対象(operator/label/account)を指す。summary は人が読む補足。
+model AdminAuditLog {
+  id         String           @id @default(cuid())
+  actorId    String
+  actor      Operator         @relation(fields: [actorId], references: [id])
+  action     AdminAuditAction
+  targetType String
+  targetId   String
+  summary    String?
+  createdAt  DateTime         @default(now())
+
+  @@index([createdAt])
+  @@index([targetType, targetId])
 }
 
 model Template {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentActor } from "@/lib/auth/current";
 import { updateOperator, resetOperatorPassword } from "@/lib/admin/admin-repo";
+import { recordAdminAudit } from "@/lib/admin/admin-audit";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           accountIds: Array.isArray(b.accountIds) ? (b.accountIds as string[]) : undefined,
         });
 
-  if (res.kind === "ok") return NextResponse.json({ ok: true });
+  if (res.kind === "ok") {
+    await recordAdminAudit({
+      actorId: actor.operatorId,
+      action: typeof b.password === "string" ? "OPERATOR_PASSWORD_RESET" : "OPERATOR_UPDATED",
+      targetType: "operator",
+      targetId: id,
+    });
+    return NextResponse.json({ ok: true });
+  }
   if (res.kind === "invalid") return NextResponse.json({ ok: false, error: res.reason }, { status: 400 });
   return NextResponse.json({ ok: false, error: "対象が見つかりません" }, { status: 404 });
 }
