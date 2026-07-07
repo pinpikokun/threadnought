@@ -7,6 +7,7 @@ export const t = {
   messages: "メッセージ",
   updatedAt: "最終更新",
   statusLabel: { UNHANDLED: "未対応", IN_PROGRESS: "対応中", DONE: "完了" },
+  roleLabel: { ADMIN: "管理者", DISPATCHER: "配分担当", MEMBER: "担当者" },
   directionLabel: { INBOUND: "受信", OUTBOUND: "送信" },
   noteTypeLabel: { INTERNAL_NOTE: "社内メモ", EXTERNAL_LOG: "外部ログ" },
   auditLabel: {

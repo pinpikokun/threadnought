@@ -9,6 +9,7 @@ import { ReplyForm } from "./reply-form";
 import { StatusControl, AddNoteForm } from "./ticket-actions";
 import { AssigneeControl, LabelControl } from "./assignment";
 import { MergeControl } from "./merge-split";
+import { AppHeader } from "../../app-header";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,9 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
   }
 
   return (
-    <main style={{ maxWidth: 900, margin: "0 auto", padding: "1rem" }}>
+    <>
+      <AppHeader actor={actor} />
+      <main style={{ maxWidth: 900, margin: "0 auto", padding: "1rem" }}>
       <a href="/" style={{ fontSize: 13 }}>← 一覧へ戻る</a>
       <header style={{ borderBottom: "1px solid #ddd", paddingBottom: ".75rem", margin: ".5rem 0 1rem" }}>
         <div style={{ fontSize: 12, color: "#888" }}>{header.caseNumber} · {header.accountName}</div>
@@ -77,6 +80,7 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
       <TimelineView items={timeline} splitTicketId={header.id} canSplit={canSplit} />
       <AddNoteForm ticketId={header.id} />
       <ReplyForm ticketId={header.id} defaultTo={defaultTo} />
-    </main>
+      </main>
+    </>
   );
 }

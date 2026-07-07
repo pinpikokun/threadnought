@@ -3,6 +3,7 @@ import { getCurrentActor } from "@/lib/auth/current";
 import { parseSearchParams, type RawSearchParams } from "@/lib/search/params";
 import { searchTickets, getFacetCounts } from "@/lib/search/search";
 import { t } from "@/lib/i18n/ja";
+import { AppHeader } from "./app-header";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +82,9 @@ export default async function Home({
   const q = (Array.isArray(raw.q) ? raw.q[0] : raw.q) ?? "";
 
   return (
-    <main style={{ display: "flex", gap: "1.5rem", padding: "1rem", alignItems: "flex-start" }}>
+    <>
+      <AppHeader actor={actor} />
+      <main style={{ display: "flex", gap: "1.5rem", padding: "1rem", alignItems: "flex-start" }}>
       <aside style={{ width: 220, flexShrink: 0, fontSize: 14 }}>
         <h2 style={{ fontSize: 15, margin: "0 0 .5rem" }}>絞り込み</h2>
 
@@ -181,7 +184,8 @@ export default async function Home({
           </tbody>
         </table>
       </div>
-    </main>
+      </main>
+    </>
   );
 }
 
