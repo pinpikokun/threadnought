@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
+import { storage } from "@/lib/storage";
 import { loadTicketDetail } from "./ticket-detail";
+
+const INLINE_KEY = "TDVWA-inline-1";
 
 const PREFIX = "TDVWA";
 let accountId = "";
@@ -29,9 +32,24 @@ beforeAll(async () => {
   await prisma.attachment.create({
     data: { messageId: msg.id, filename: "doc.pdf", contentType: "application/pdf", storageKey: `${PREFIX}-key-1`, size: 2048, inline: false },
   });
+
+  // cid インライン画像テスト用の2通目(送信時刻を後にして1通目のアサーションに影響させない)。
+  const msg2 = await prisma.message.create({
+    data: {
+      ticketId, direction: "INBOUND", messageId: `${PREFIX}-msg-2@x.com`,
+      fromAddr: "c@x.com", toAddrs: ["s@x.com"], subject: "ロゴ入り",
+      bodyText: null, bodyHtml: '<p>ロゴ <img src="cid:logo@x"></p>', sentAt: new Date("2026-07-06T01:00:00Z"),
+    },
+  });
+  const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]);
+  await storage.put(INLINE_KEY, pngBytes);
+  await prisma.attachment.create({
+    data: { messageId: msg2.id, filename: "logo.png", contentType: "image/png", storageKey: INLINE_KEY, size: pngBytes.length, inline: true, contentId: "logo@x" },
+  });
 });
 
 afterAll(async () => {
+  await storage.delete(INLINE_KEY).catch(() => {});
   await prisma.attachment.deleteMany({ where: { storageKey: { startsWith: `${PREFIX}-` } } });
   await prisma.message.deleteMany({ where: { messageId: { startsWith: `${PREFIX}-` } } });
   const tk = await prisma.ticket.findUnique({ where: { id: ticketId }, select: { id: true } });
@@ -65,6 +83,17 @@ describe("loadTicketDetail", () => {
       expect(msg.attachments).toHaveLength(1);
       expect(msg.attachments[0].filename).toBe("doc.pdf");
       expect(msg.attachments[0].size).toBe(2048);
+    }
+  });
+
+  it("cid インライン画像が data URI として本文へ埋め込まれる", async () => {
+    const d = await loadTicketDetail(ticketId);
+    const msgs = d!.timeline.filter((i) => i.kind === "message");
+    const withImg = msgs.find((m) => m.kind === "message" && !!m.bodyHtml?.includes("data:image/png;base64,"));
+    expect(withImg).toBeDefined();
+    if (withImg && withImg.kind === "message") {
+      expect(withImg.bodyHtml).toContain("data:image/png;base64,");
+      expect(withImg.bodyHtml).not.toContain("cid:logo@x");
     }
   });
 
