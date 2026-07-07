@@ -9,6 +9,8 @@ export type TicketListItem = {
   assigneeName: string | null;
   messageCount: number;
   updatedAt: Date;
+  isPinned: boolean;
+  dueDate: Date | null;
 };
 
 // listTickets / searchTickets 共通の行→表示アイテム変換（DRY）
@@ -20,6 +22,8 @@ export type TicketRowForList = {
   assignee: { displayName: string } | null;
   messageCount: number;
   updatedAt: Date;
+  isPinned: boolean;
+  dueDate: Date | null;
 };
 
 export function toTicketListItem(r: TicketRowForList): TicketListItem {
@@ -31,8 +35,13 @@ export function toTicketListItem(r: TicketRowForList): TicketListItem {
     assigneeName: r.assignee?.displayName ?? null,
     messageCount: r.messageCount,
     updatedAt: r.updatedAt,
+    isPinned: r.isPinned,
+    dueDate: r.dueDate,
   };
 }
+
+// ピン留めを先頭に、その中では更新の新しい順。一覧の既定並び。
+export const LIST_ORDER = [{ isPinned: "desc" as const }, { updatedAt: "desc" as const }];
 
 export async function listTickets(actor: { role: Role; accountIds: string[] }): Promise<TicketListItem[]> {
   const rows = await prisma.ticket.findMany({
@@ -42,7 +51,7 @@ export async function listTickets(actor: { role: Role; accountIds: string[] }): 
       ...(actor.role === "ADMIN" ? {} : { accountId: { in: actor.accountIds } }),
     },
     include: { assignee: true },
-    orderBy: { updatedAt: "desc" },
+    orderBy: LIST_ORDER,
   });
   return rows.map(toTicketListItem);
 }

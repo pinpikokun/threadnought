@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Role, TicketStatus } from "@/generated/prisma/client";
-import { toTicketListItem, type TicketListItem } from "@/lib/tickets";
+import { toTicketListItem, LIST_ORDER, type TicketListItem } from "@/lib/tickets";
 import { pgTrgmSearchProvider } from "./pg-adapter";
 import type { SearchProvider } from "./provider";
 
@@ -71,7 +71,8 @@ export async function searchTickets(
       ...textWhere,
     },
     include: { assignee: true },
-    orderBy: { updatedAt: "desc" },
+    // ピン留め優先→更新順。テキスト検索時は下で関連度順に上書きする。
+    orderBy: LIST_ORDER,
   });
 
   const items = rows.map(toTicketListItem);

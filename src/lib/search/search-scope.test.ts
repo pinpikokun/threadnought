@@ -63,6 +63,18 @@ describe("searchTickets 窓口スコープ(M-c回帰)", () => {
     const nums = res.map((t) => t.caseNumber).sort();
     expect(nums).toEqual([`${PREFIX}A-000001`, `${PREFIX}A-000002`]);
   });
+
+  it("ピン留めは更新順より優先して先頭に並ぶ", async () => {
+    // A-000001 は先に作成(=updatedAt が古い)ため、ピン無しでは A-000002 が先頭。
+    await prisma.ticket.update({ where: { caseNumber: `${PREFIX}A-000001` }, data: { isPinned: true } });
+    try {
+      const res = await searchTickets(memberOfA(), {});
+      expect(res[0].caseNumber).toBe(`${PREFIX}A-000001`);
+      expect(res[0].isPinned).toBe(true);
+    } finally {
+      await prisma.ticket.update({ where: { caseNumber: `${PREFIX}A-000001` }, data: { isPinned: false } });
+    }
+  });
 });
 
 describe("getFacetCounts 窓口スコープ(M-c回帰)", () => {

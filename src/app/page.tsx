@@ -167,9 +167,17 @@ export default async function Home({
             {tickets.map((x) => (
               <tr key={x.id} style={{ borderBottom: "1px solid #eee" }}>
                 <td style={{ padding: ".4rem", whiteSpace: "nowrap" }}>
+                  {x.isPinned && <span title="ピン留め" style={{ color: "#f59e0b", marginRight: ".2rem" }}>📌</span>}
                   <a href={`/tickets/${x.id}`}>{x.caseNumber}</a>
                 </td>
-                <td style={{ padding: ".4rem" }}>{x.title}</td>
+                <td style={{ padding: ".4rem" }}>
+                  {x.title}
+                  {x.dueDate && (
+                    <span style={{ marginLeft: ".5rem", fontSize: 12, color: "#b45309", background: "#fef3c7", borderRadius: 4, padding: ".05rem .35rem", whiteSpace: "nowrap" }}>
+                      期日 {x.dueDate.toLocaleDateString("ja-JP")}
+                    </span>
+                  )}
+                </td>
                 <td style={{ padding: ".4rem" }}>{t.statusLabel[x.status]}</td>
                 <td style={{ padding: ".4rem" }}>{x.assigneeName ?? "—"}</td>
                 <td style={{ padding: ".4rem" }}>{x.messageCount}</td>
