@@ -10,9 +10,9 @@ describe("i18n ラベル", () => {
     expect(t.noteTypeLabel.INTERNAL_NOTE).toBe("社内メモ");
     expect(t.noteTypeLabel.EXTERNAL_LOG).toBe("外部ログ");
   });
-  it("監査アクションラベルが8種そろう", () => {
+  it("監査アクションラベルが12種そろう", () => {
     expect(Object.keys(t.auditLabel).sort()).toEqual(
-      ["ASSIGNEE_CHANGED", "LABEL_ADDED", "LABEL_REMOVED", "MERGED", "REOPENED", "REPLIED", "SPLIT", "STATUS_CHANGED"],
+      ["ASSIGNEE_CHANGED", "DUE_DATE_CHANGED", "LABEL_ADDED", "LABEL_REMOVED", "MERGED", "PINNED", "REOPENED", "REPLIED", "SPLIT", "STATUS_CHANGED", "TITLE_CHANGED", "UNPINNED"],
     );
   });
 });

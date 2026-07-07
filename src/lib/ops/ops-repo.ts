@@ -218,35 +218,68 @@ export async function splitMessage(input: {
   return { kind: "ok", newTicketId, caseNumber };
 }
 
+// 期日の監査値は日付(YYYY-MM-DD)で残す。ローカライズ文字列をDBに入れない。
+function fmtDueDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
 // チケットの件名・ピン留め・期日を部分更新する。
-// 注: これらの編集は現状 AuditLog に記録しない(専用 AuditAction が未整備のため)。
-// 監査が必要になった時点で enum 追加(本番マイグレーション)とあわせて writeAudits を足す。
+// 実際に値が変わったフィールドだけを AuditLog に記録する(no-op は監査しない)。
 export async function updateTicketFields(input: {
   ticketId: string;
+  actorId: string;
   title?: string;
   isPinned?: boolean;
   dueDate?: string | null; // ISO文字列 or null(=期日クリア)
 }): Promise<OpResult> {
-  const ticket = await prisma.ticket.findUnique({ where: { id: input.ticketId }, select: { id: true } });
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: input.ticketId },
+    select: { id: true, title: true, isPinned: true, dueDate: true },
+  });
   if (!ticket) return { kind: "not_found" };
 
   const data: Prisma.TicketUpdateInput = {};
+  const audits: AuditEntry[] = [];
+
   if (input.title !== undefined) {
-    if (input.title.trim() === "") return { kind: "invalid", reason: "件名を入力してください" };
-    data.title = input.title.trim();
+    const next = input.title.trim();
+    if (next === "") return { kind: "invalid", reason: "件名を入力してください" };
+    if (next !== ticket.title) {
+      data.title = next;
+      audits.push({ action: "TITLE_CHANGED", fromValue: ticket.title, toValue: next });
+    }
   }
-  if (input.isPinned !== undefined) data.isPinned = input.isPinned;
+
+  if (input.isPinned !== undefined && input.isPinned !== ticket.isPinned) {
+    data.isPinned = input.isPinned;
+    audits.push({ action: input.isPinned ? "PINNED" : "UNPINNED" });
+  }
+
   if (input.dueDate !== undefined) {
+    let next: Date | null;
     if (input.dueDate === null || input.dueDate === "") {
-      data.dueDate = null;
+      next = null;
     } else {
       const d = new Date(input.dueDate);
       if (Number.isNaN(d.getTime())) return { kind: "invalid", reason: "期日の形式が不正です" };
-      data.dueDate = d;
+      next = d;
+    }
+    const changed = (ticket.dueDate?.getTime() ?? null) !== (next?.getTime() ?? null);
+    if (changed) {
+      data.dueDate = next;
+      audits.push({
+        action: "DUE_DATE_CHANGED",
+        fromValue: ticket.dueDate ? fmtDueDate(ticket.dueDate) : undefined,
+        toValue: next ? fmtDueDate(next) : undefined,
+      });
     }
   }
 
   if (Object.keys(data).length === 0) return { kind: "ok", changed: false };
-  await prisma.ticket.update({ where: { id: input.ticketId }, data });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.ticket.update({ where: { id: input.ticketId }, data });
+    await writeAudits(tx, input.ticketId, input.actorId, audits);
+  });
   return { kind: "ok", changed: true };
 }

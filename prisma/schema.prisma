@@ -38,6 +38,10 @@ enum AuditAction {
   MERGED
   SPLIT
   REPLIED
+  TITLE_CHANGED
+  PINNED
+  UNPINNED
+  DUE_DATE_CHANGED
 }
 
 model Operator {

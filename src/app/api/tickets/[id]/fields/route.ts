@@ -24,6 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   return opResultToResponse(
     await updateTicketFields({
       ticketId: id,
+      actorId: actor.operatorId,
       title: typeof b.title === "string" ? b.title : undefined,
       isPinned: typeof b.isPinned === "boolean" ? b.isPinned : undefined,
       dueDate:

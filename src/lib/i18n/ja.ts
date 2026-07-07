@@ -19,5 +19,9 @@ export const t = {
     MERGED: "統合",
     SPLIT: "分割",
     REPLIED: "返信",
+    TITLE_CHANGED: "件名を変更",
+    PINNED: "ピン留め",
+    UNPINNED: "ピン留めを解除",
+    DUE_DATE_CHANGED: "期日を変更",
   },
 } as const;
