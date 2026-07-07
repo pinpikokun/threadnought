@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/generated/prisma/client";
 import { hashPassword } from "@/lib/auth/password";
+import { encryptSecret, encryptionAvailable } from "@/lib/crypto/secret";
+import { Prisma } from "@/generated/prisma/client";
 import {
   validateNewOperator,
   validatePassword,
@@ -264,5 +266,44 @@ export async function updateAccount(
       signature: normalizeSignature(input.signature),
     },
   });
+  return { kind: "ok", value: undefined };
+}
+
+export interface CredentialsInput {
+  imap?: { host: string; port: number; secure: boolean; user: string; pass: string; mailbox?: string };
+  smtp?: { host: string; port: number; secure: boolean; user: string; pass: string };
+}
+
+// 窓口の認証情報(IMAP/SMTP)を暗号化して config に保存する。
+// 既存の読み取り形に合わせ、IMAP は config 直下(平坦)、SMTP は config.smtp 配下に格納する。
+// pass は encryptSecret で暗号化。config の他キー(既存の設定)は保持する。
+export async function setAccountCredentials(id: string, input: CredentialsInput): Promise<AdminResult> {
+  if (!input.imap && !input.smtp) return { kind: "invalid", reason: "imap または smtp のいずれかが必要です" };
+  if (!encryptionAvailable()) return { kind: "invalid", reason: "暗号化鍵(CONFIG_ENCRYPTION_KEY)が未設定です" };
+
+  const acc = await prisma.mailAccount.findUnique({ where: { id }, select: { config: true } });
+  if (!acc) return { kind: "not_found" };
+
+  const config: Record<string, unknown> = { ...((acc.config as Record<string, unknown> | null) ?? {}) };
+
+  if (input.imap) {
+    config.host = input.imap.host;
+    config.port = input.imap.port;
+    config.secure = input.imap.secure;
+    config.user = input.imap.user;
+    config.pass = encryptSecret(input.imap.pass);
+    if (input.imap.mailbox) config.mailbox = input.imap.mailbox;
+  }
+  if (input.smtp) {
+    config.smtp = {
+      host: input.smtp.host,
+      port: input.smtp.port,
+      secure: input.smtp.secure,
+      user: input.smtp.user,
+      pass: encryptSecret(input.smtp.pass),
+    };
+  }
+
+  await prisma.mailAccount.update({ where: { id }, data: { config: config as Prisma.InputJsonValue } });
   return { kind: "ok", value: undefined };
 }

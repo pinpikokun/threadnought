@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ImapReceiver, type ImapConfig } from "@/lib/mail/adapters/imap";
+import { ImapReceiver } from "@/lib/mail/adapters/imap";
+import { resolveImapConfig } from "@/lib/mail/config";
 import { ingestNew } from "@/lib/mail/ingest";
 import { prismaIngestRepository } from "@/lib/mail/ingest-repo";
 import { publishNotification, type NotifyEvent } from "@/lib/notify/bus";
@@ -22,8 +23,8 @@ export async function POST(req: NextRequest) {
   // 取り込みで動いたチケット(新規/追記/再オープン)を集め、後でまとめて通知イベントを発火する。
   const affected: { ticketId: string; type: NotifyEvent["type"] }[] = [];
   for (const acc of accounts) {
-    const cfg = acc.config as unknown as ImapConfig;
-    if (!cfg?.host) continue; // 未設定アカウントはスキップ
+    const cfg = resolveImapConfig(acc.config); // 認証情報(pass)は復号される
+    if (!cfg) continue; // 未設定アカウントはスキップ
     const receiver = new ImapReceiver(cfg);
     const results = await ingestNew(receiver, { accountId: acc.id, prefix: acc.casePrefix }, prismaIngestRepository);
     for (const r of results) {

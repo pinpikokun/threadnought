@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendReply } from "@/lib/mail/reply";
 import { prismaReplyRepository } from "@/lib/mail/reply-repo";
-import { SmtpSender, type SmtpConfig } from "@/lib/mail/adapters/smtp";
+import { SmtpSender } from "@/lib/mail/adapters/smtp";
+import { resolveSmtpConfig } from "@/lib/mail/config";
 import { renderTemplate } from "@/lib/templates/render";
 import { getCurrentActor } from "@/lib/auth/current";
 import { assertTicketAccess } from "@/lib/auth/access";
@@ -58,8 +59,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!acc) {
     return NextResponse.json({ ok: false, error: "ticket not found" }, { status: 404 });
   }
-  const cfg = (acc.account.config ?? {}) as { smtp?: SmtpConfig };
-  if (!cfg.smtp?.host) {
+  const smtp = resolveSmtpConfig(acc.account.config); // 認証情報(pass)は復号される
+  if (!smtp) {
     return NextResponse.json({ ok: false, error: "この窓口に SMTP 設定がありません（config.smtp）" }, { status: 400 });
   }
 
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const result = await sendReply(
     { ticketId: id, operatorId: actor.operatorId, bodyText: text, to, cc, bcc, includeQuote },
-    { repo: prismaReplyRepository, sender: new SmtpSender(cfg.smtp) },
+    { repo: prismaReplyRepository, sender: new SmtpSender(smtp) },
   );
   if (result.kind === "not_found") {
     return NextResponse.json({ ok: false, error: "ticket not found or has no inbound message" }, { status: 404 });

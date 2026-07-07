@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/auth/password";
+import { isEncrypted } from "@/lib/crypto/secret";
+import { resolveImapConfig, resolveSmtpConfig } from "@/lib/mail/config";
 import {
   listOperators,
   listAccounts,
@@ -14,6 +16,7 @@ import {
   listAccountsDetail,
   createAccount,
   updateAccount,
+  setAccountCredentials,
 } from "./admin-repo";
 
 // 非重複PREFIX(既存 LKUP/MGCND/NUMT/OP/MS/AUTH/SESS/TLST/SX*/ADMOP と前方一致しない)。
@@ -214,5 +217,43 @@ describe("窓口(MailAccount)管理", () => {
 
   it("存在しない id の更新は not_found", async () => {
     expect((await updateAccount("nonexistent-admop-acc", { name: "x" })).kind).toBe("not_found");
+  });
+});
+
+describe("setAccountCredentials(認証情報の暗号化保存)", () => {
+  it("IMAP/SMTPのpassを暗号化して保存し、復号で元に戻る", async () => {
+    const created = await createAccount({ name: `${PREFIX}cred`, casePrefix: `${PREFIX}CR` });
+    const id = (created as { kind: "ok"; value: { id: string } }).value.id;
+
+    const res = await setAccountCredentials(id, {
+      imap: { host: "imap.example.com", port: 993, secure: true, user: "iuser", pass: "imap-plain", mailbox: "INBOX" },
+      smtp: { host: "smtp.example.com", port: 587, secure: false, user: "suser", pass: "smtp-plain" },
+    });
+    expect(res.kind).toBe("ok");
+
+    // DB上のpassは平文ではなく暗号化されている。
+    const raw = await prisma.mailAccount.findUnique({ where: { id }, select: { config: true } });
+    const config = raw!.config as { pass: string; smtp: { pass: string } };
+    expect(config.pass).not.toBe("imap-plain");
+    expect(isEncrypted(config.pass)).toBe(true);
+    expect(isEncrypted(config.smtp.pass)).toBe(true);
+
+    // 読み取りヘルパで復号すると元のパスワードに戻る。
+    const imap = resolveImapConfig(config);
+    const smtp = resolveSmtpConfig(config);
+    expect(imap!.pass).toBe("imap-plain");
+    expect(imap!.host).toBe("imap.example.com");
+    expect(smtp!.pass).toBe("smtp-plain");
+  });
+
+  it("imap/smtp どちらも無ければ invalid", async () => {
+    const created = await createAccount({ name: `${PREFIX}cred2`, casePrefix: `${PREFIX}C2` });
+    const id = (created as { kind: "ok"; value: { id: string } }).value.id;
+    expect((await setAccountCredentials(id, {})).kind).toBe("invalid");
+  });
+
+  it("存在しない id は not_found", async () => {
+    const res = await setAccountCredentials("nonexistent-admop-cred", { smtp: { host: "h", port: 25, secure: false, user: "u", pass: "p" } });
+    expect(res.kind).toBe("not_found");
   });
 });
