@@ -1,0 +1,208 @@
+"use client";
+
+import { useState, type CSSProperties, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { t } from "@/lib/i18n/ja";
+import type { Role } from "@/generated/prisma/client";
+import type { OperatorRow, AccountRow } from "@/lib/admin/admin-repo";
+
+const ROLES: Role[] = ["ADMIN", "DISPATCHER", "MEMBER"];
+const inputStyle: CSSProperties = { padding: ".35rem .5rem", fontSize: 13, boxSizing: "border-box" };
+const btnStyle = (busy: boolean, primary = false): CSSProperties => ({
+  fontSize: 13,
+  padding: ".35rem .9rem",
+  border: primary ? "none" : "1px solid #d1d5db",
+  borderRadius: 4,
+  background: busy ? "#9ca3af" : primary ? "#374151" : "#fff",
+  color: primary ? "#fff" : "#374151",
+  cursor: busy ? "default" : "pointer",
+});
+const errStyle: CSSProperties = { color: "#dc2626", fontSize: 12 };
+const okStyle: CSSProperties = { color: "#16a34a", fontSize: 12 };
+
+// 割当窓口のチェックボックス群(作成・編集で共用)。
+function AccountChecks({
+  accounts,
+  selected,
+  disabled,
+  onToggle,
+}: {
+  accounts: AccountRow[];
+  selected: Set<string>;
+  disabled: boolean;
+  onToggle: (id: string) => void;
+}) {
+  if (accounts.length === 0) return <span style={{ fontSize: 12, color: "#999" }}>窓口未登録</span>;
+  return (
+    <span style={{ display: "inline-flex", flexWrap: "wrap", gap: ".5rem" }}>
+      {accounts.map((a) => (
+        <label key={a.id} style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: ".2rem" }}>
+          <input type="checkbox" checked={selected.has(a.id)} disabled={disabled} onChange={() => onToggle(a.id)} />
+          {a.name}
+        </label>
+      ))}
+    </span>
+  );
+}
+
+// 新規オペレータ作成フォーム。
+export function CreateOperatorForm({ accounts }: { accounts: AccountRow[] }) {
+  const router = useRouter();
+  const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<Role>("MEMBER");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setOkMsg(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/operators", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ username, displayName, password, role, accountIds: [...selected] }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        setError(data?.error ?? "作成に失敗しました");
+        return;
+      }
+      setUsername("");
+      setDisplayName("");
+      setPassword("");
+      setRole("MEMBER");
+      setSelected(new Set());
+      setOkMsg("オペレータを作成しました");
+      router.refresh();
+    } catch {
+      setError("作成中にエラーが発生しました");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "1rem", marginBottom: "1.5rem", display: "flex", flexDirection: "column", gap: ".6rem", maxWidth: 640 }}>
+      <h2 style={{ fontSize: 15, margin: 0 }}>オペレータを追加</h2>
+      <div style={{ display: "flex", gap: ".6rem", flexWrap: "wrap" }}>
+        <input value={username} disabled={busy} onChange={(e) => setUsername(e.target.value)} placeholder="ユーザー名" autoComplete="off" style={{ ...inputStyle, flex: 1, minWidth: 140 }} />
+        <input value={displayName} disabled={busy} onChange={(e) => setDisplayName(e.target.value)} placeholder="表示名" style={{ ...inputStyle, flex: 1, minWidth: 140 }} />
+      </div>
+      <div style={{ display: "flex", gap: ".6rem", flexWrap: "wrap", alignItems: "center" }}>
+        <input type="password" value={password} disabled={busy} onChange={(e) => setPassword(e.target.value)} placeholder="初期パスワード(8文字以上)" autoComplete="new-password" style={{ ...inputStyle, flex: 1, minWidth: 200 }} />
+        <select value={role} disabled={busy} onChange={(e) => setRole(e.target.value as Role)} style={inputStyle}>
+          {ROLES.map((r) => (
+            <option key={r} value={r}>{t.roleLabel[r]}</option>
+          ))}
+        </select>
+      </div>
+      <div style={{ fontSize: 12, color: "#555" }}>
+        担当窓口: <AccountChecks accounts={accounts} selected={selected} disabled={busy} onToggle={toggle} />
+      </div>
+      {error && <span style={errStyle}>{error}</span>}
+      {okMsg && <span style={okStyle}>{okMsg}</span>}
+      <div>
+        <button type="submit" disabled={busy} style={btnStyle(busy, true)}>{busy ? "作成中..." : "作成"}</button>
+      </div>
+    </form>
+  );
+}
+
+// 1オペレータの編集行: role/有効/割当窓口の保存 + パスワードリセット。
+export function OperatorRowEditor({ op, accounts }: { op: OperatorRow; accounts: AccountRow[] }) {
+  const router = useRouter();
+  const [role, setRole] = useState<Role>(op.role);
+  const [isActive, setIsActive] = useState(op.isActive);
+  const [selected, setSelected] = useState<Set<string>>(new Set(op.accounts.map((a) => a.id)));
+  const [pw, setPw] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function send(payload: object, successMsg: string) {
+    setError(null);
+    setOkMsg(null);
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/operators/${op.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        setError(data?.error ?? "更新に失敗しました");
+        return;
+      }
+      setOkMsg(successMsg);
+      router.refresh();
+    } catch {
+      setError("更新中にエラーが発生しました");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: ".75rem 1rem", display: "flex", flexDirection: "column", gap: ".5rem" }}>
+      <div style={{ display: "flex", gap: ".75rem", alignItems: "baseline", flexWrap: "wrap" }}>
+        <strong style={{ fontSize: 14 }}>{op.displayName}</strong>
+        <span style={{ fontSize: 12, color: "#888" }}>@{op.username}</span>
+      </div>
+      <div style={{ display: "flex", gap: ".75rem", alignItems: "center", flexWrap: "wrap" }}>
+        <label style={{ fontSize: 12, color: "#555", display: "inline-flex", alignItems: "center", gap: ".3rem" }}>
+          ロール:
+          <select value={role} disabled={busy} onChange={(e) => setRole(e.target.value as Role)} style={inputStyle}>
+            {ROLES.map((r) => (
+              <option key={r} value={r}>{t.roleLabel[r]}</option>
+            ))}
+          </select>
+        </label>
+        <label style={{ fontSize: 12, color: "#555", display: "inline-flex", alignItems: "center", gap: ".3rem" }}>
+          <input type="checkbox" checked={isActive} disabled={busy} onChange={(e) => setIsActive(e.target.checked)} />
+          有効
+        </label>
+      </div>
+      <div style={{ fontSize: 12, color: "#555" }}>
+        担当窓口: <AccountChecks accounts={accounts} selected={selected} disabled={busy} onToggle={toggle} />
+      </div>
+      <div style={{ display: "flex", gap: ".75rem", alignItems: "center", flexWrap: "wrap" }}>
+        <button type="button" disabled={busy} onClick={() => send({ role, isActive, accountIds: [...selected] }, "保存しました")} style={btnStyle(busy, true)}>
+          保存
+        </button>
+        <span style={{ display: "inline-flex", gap: ".3rem", alignItems: "center" }}>
+          <input type="password" value={pw} disabled={busy} onChange={(e) => setPw(e.target.value)} placeholder="新パスワード" autoComplete="new-password" style={{ ...inputStyle, width: 160 }} />
+          <button type="button" disabled={busy || pw.length === 0} onClick={() => { send({ password: pw }, "パスワードを更新しました"); setPw(""); }} style={btnStyle(busy || pw.length === 0)}>
+            パスワード更新
+          </button>
+        </span>
+      </div>
+      {error && <span style={errStyle}>{error}</span>}
+      {okMsg && <span style={okStyle}>{okMsg}</span>}
+    </div>
+  );
+}

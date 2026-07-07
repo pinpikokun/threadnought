@@ -24,9 +24,16 @@ export async function AppHeader({ actor }: { actor: AppActor }) {
         background: "#fff",
       }}
     >
-      <Link href="/" style={{ fontSize: 16, fontWeight: 700, color: "#111", textDecoration: "none" }}>
-        Threadnought
-      </Link>
+      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+        <Link href="/" style={{ fontSize: 16, fontWeight: 700, color: "#111", textDecoration: "none" }}>
+          Threadnought
+        </Link>
+        {actor.role === "ADMIN" && (
+          <Link href="/admin" style={{ fontSize: 13, color: "#2563eb", textDecoration: "none" }}>
+            設定
+          </Link>
+        )}
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: ".75rem", fontSize: 13, color: "#555" }}>
         {op && (
           <span>
