@@ -4,7 +4,7 @@ import { useState, type CSSProperties, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { t } from "@/lib/i18n/ja";
 import type { Role } from "@/generated/prisma/client";
-import type { OperatorRow, AccountRow, LabelRow } from "@/lib/admin/admin-repo";
+import type { OperatorRow, AccountRow, LabelRow, AccountDetailRow } from "@/lib/admin/admin-repo";
 
 const ROLES: Role[] = ["ADMIN", "DISPATCHER", "MEMBER"];
 const inputStyle: CSSProperties = { padding: ".35rem .5rem", fontSize: 13, boxSizing: "border-box" };
@@ -286,6 +286,122 @@ function LabelRowEditor({
       <input type="color" value={color} disabled={busy} onChange={(e) => setColor(e.target.value)} title="色" style={{ width: 40, height: 30, padding: 0, border: "1px solid #d1d5db", borderRadius: 4 }} />
       <button type="button" disabled={busy || name.trim() === ""} onClick={() => onSave(name, color)} style={btnStyle(busy || name.trim() === "")}>保存</button>
       <button type="button" disabled={busy} onClick={() => { if (window.confirm(`ラベル「${label.name}」を削除します。よろしいですか？`)) onDelete(); }} style={{ ...btnStyle(busy), color: "#dc2626", borderColor: "#fca5a5" }}>削除</button>
+    </div>
+  );
+}
+
+// 窓口(MailAccount)管理: 作成 + 各窓口の名前/署名編集。
+// casePrefix(採番接頭辞)は作成時のみ。IMAP/SMTP認証情報(config)編集は対象外。
+export function AccountManager({ accounts }: { accounts: AccountDetailRow[] }) {
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [casePrefix, setCasePrefix] = useState("");
+  const [signature, setSignature] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
+
+  async function onCreate(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setOkMsg(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/accounts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, casePrefix, signature }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        setError(data?.error ?? "作成に失敗しました");
+        return;
+      }
+      setName("");
+      setCasePrefix("");
+      setSignature("");
+      setOkMsg("窓口を作成しました");
+      router.refresh();
+    } catch {
+      setError("作成中にエラーが発生しました");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <form onSubmit={onCreate} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "1rem", marginBottom: "1rem", display: "flex", flexDirection: "column", gap: ".6rem", maxWidth: 640 }}>
+        <h3 style={{ fontSize: 14, margin: 0, color: "#555" }}>窓口を追加</h3>
+        <div style={{ display: "flex", gap: ".6rem", flexWrap: "wrap" }}>
+          <input value={name} disabled={busy} onChange={(e) => setName(e.target.value)} placeholder="窓口名" style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
+          <input value={casePrefix} disabled={busy} onChange={(e) => setCasePrefix(e.target.value)} placeholder="採番接頭辞 (例 SUP)" style={{ ...inputStyle, width: 160 }} />
+        </div>
+        <textarea value={signature} disabled={busy} onChange={(e) => setSignature(e.target.value)} rows={2} placeholder="署名(任意)" style={{ ...inputStyle, resize: "vertical" }} />
+        <div style={{ fontSize: 11, color: "#999" }}>
+          採番接頭辞は作成後に変更できません。IMAP/SMTP の接続情報は別途設定します。
+        </div>
+        {error && <span style={errStyle}>{error}</span>}
+        {okMsg && <span style={okStyle}>{okMsg}</span>}
+        <div>
+          <button type="submit" disabled={busy || name.trim() === "" || casePrefix.trim() === ""} style={btnStyle(busy || name.trim() === "" || casePrefix.trim() === "", true)}>作成</button>
+        </div>
+      </form>
+      <div style={{ display: "flex", flexDirection: "column", gap: ".5rem" }}>
+        {accounts.map((a) => (
+          <AccountRowEditor key={a.id} account={a} />
+        ))}
+        {accounts.length === 0 && <span style={{ fontSize: 12, color: "#999" }}>窓口はまだありません</span>}
+      </div>
+    </div>
+  );
+}
+
+function AccountRowEditor({ account }: { account: AccountDetailRow }) {
+  const router = useRouter();
+  const [name, setName] = useState(account.name);
+  const [signature, setSignature] = useState(account.signature);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
+
+  async function onSave() {
+    setError(null);
+    setOkMsg(null);
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/accounts/${account.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, signature }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        setError(data?.error ?? "更新に失敗しました");
+        return;
+      }
+      setOkMsg("保存しました");
+      router.refresh();
+    } catch {
+      setError("更新中にエラーが発生しました");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: ".75rem 1rem", display: "flex", flexDirection: "column", gap: ".5rem" }}>
+      <div style={{ display: "flex", gap: ".5rem", alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12, background: "#f3f4f6", borderRadius: 4, padding: ".1rem .4rem", fontFamily: "var(--font-geist-mono, monospace)" }}>{account.casePrefix}</span>
+        <input value={name} disabled={busy} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
+        <span style={{ fontSize: 11, color: "#999" }}>チケット{account.ticketCount} · 担当{account.operatorCount}</span>
+      </div>
+      <textarea value={signature} disabled={busy} onChange={(e) => setSignature(e.target.value)} rows={2} placeholder="署名(任意)" style={{ ...inputStyle, resize: "vertical" }} />
+      <div style={{ display: "flex", gap: ".5rem", alignItems: "center" }}>
+        <button type="button" disabled={busy || name.trim() === ""} onClick={onSave} style={btnStyle(busy || name.trim() === "", true)}>保存</button>
+        {error && <span style={errStyle}>{error}</span>}
+        {okMsg && <span style={okStyle}>{okMsg}</span>}
+      </div>
     </div>
   );
 }

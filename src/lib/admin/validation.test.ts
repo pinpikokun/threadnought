@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateNewOperator, validatePassword, isValidRole, validateLabelName, normalizeColor } from "./validation";
+import { validateNewOperator, validatePassword, isValidRole, validateLabelName, normalizeColor, validateNewAccount, normalizeSignature } from "./validation";
 
 describe("isValidRole", () => {
   it("ADMIN/DISPATCHER/MEMBER を受理し、それ以外を拒否", () => {
@@ -63,5 +63,27 @@ describe("normalizeColor", () => {
     expect(normalizeColor("")).toBeNull();
     expect(normalizeColor(undefined)).toBeNull();
     expect(normalizeColor(123)).toBeNull();
+  });
+});
+
+describe("validateNewAccount", () => {
+  it("name/casePrefix が妥当なら ok", () => {
+    expect(validateNewAccount({ name: "サポート窓口", casePrefix: "SUP" }).ok).toBe(true);
+    expect(validateNewAccount({ name: "A", casePrefix: "A-1" }).ok).toBe(true);
+  });
+  it("name 空・prefix 空/空白含む/記号は invalid", () => {
+    expect(validateNewAccount({ name: "  ", casePrefix: "SUP" }).ok).toBe(false);
+    expect(validateNewAccount({ name: "X", casePrefix: "  " }).ok).toBe(false);
+    expect(validateNewAccount({ name: "X", casePrefix: "SU P" }).ok).toBe(false);
+    expect(validateNewAccount({ name: "X", casePrefix: "SUP!" }).ok).toBe(false);
+  });
+});
+
+describe("normalizeSignature", () => {
+  it("undefined は skip、空文字は null、文字列はそのまま", () => {
+    expect(normalizeSignature(undefined)).toBeUndefined();
+    expect(normalizeSignature("")).toBeNull();
+    expect(normalizeSignature("敬具")).toBe("敬具");
+    expect(normalizeSignature(123)).toBeNull();
   });
 });

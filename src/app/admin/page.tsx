@@ -1,8 +1,8 @@
 import { redirect, notFound } from "next/navigation";
 import { getCurrentActor } from "@/lib/auth/current";
-import { listOperators, listAccounts, listLabels } from "@/lib/admin/admin-repo";
+import { listOperators, listAccounts, listLabels, listAccountsDetail } from "@/lib/admin/admin-repo";
 import { AppHeader } from "../app-header";
-import { CreateOperatorForm, OperatorRowEditor, LabelManager } from "./admin-parts";
+import { CreateOperatorForm, OperatorRowEditor, LabelManager, AccountManager } from "./admin-parts";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,12 @@ export default async function AdminPage() {
   // ADMIN 以外には存在を見せない(404 に潰す)。
   if (actor.role !== "ADMIN") notFound();
 
-  const [operators, accounts, labels] = await Promise.all([listOperators(), listAccounts(), listLabels()]);
+  const [operators, accounts, labels, accountsDetail] = await Promise.all([
+    listOperators(),
+    listAccounts(),
+    listLabels(),
+    listAccountsDetail(),
+  ]);
 
   return (
     <>
@@ -29,6 +34,11 @@ export default async function AdminPage() {
               <OperatorRowEditor key={op.id} op={op} accounts={accounts} />
             ))}
           </div>
+        </section>
+
+        <section style={{ marginBottom: "2rem" }}>
+          <h2 style={{ fontSize: 16, margin: "0 0 .75rem" }}>窓口管理</h2>
+          <AccountManager accounts={accountsDetail} />
         </section>
 
         <section>

@@ -7,6 +7,8 @@ import {
   isValidRole,
   validateLabelName,
   normalizeColor,
+  validateNewAccount,
+  normalizeSignature,
 } from "./validation";
 
 // ADMIN設定: オペレータの一覧/作成/更新。呼び出し側(ルート/ページ)で ADMIN 限定を担保する。
@@ -179,5 +181,88 @@ export async function deleteLabel(id: string): Promise<AdminResult> {
   const existing = await prisma.label.findUnique({ where: { id }, select: { id: true } });
   if (!existing) return { kind: "not_found" };
   await prisma.label.delete({ where: { id } });
+  return { kind: "ok", value: undefined };
+}
+
+// ===== 窓口(MailAccount)管理 =====
+// casePrefix は採番(Counter)キーのため作成後は変更不可。config(IMAP/SMTP認証情報)の
+// 編集はこの増分の対象外(暗号化設計が将来課題)。作成時は空 config で登録する。
+
+export type AccountDetailRow = {
+  id: string;
+  name: string;
+  casePrefix: string;
+  signature: string;
+  adapterType: string;
+  ticketCount: number;
+  operatorCount: number;
+};
+
+export async function listAccountsDetail(): Promise<AccountDetailRow[]> {
+  const accounts = await prisma.mailAccount.findMany({
+    select: {
+      id: true,
+      name: true,
+      casePrefix: true,
+      signature: true,
+      adapterType: true,
+      _count: { select: { tickets: true, operators: true } },
+    },
+    orderBy: { casePrefix: "asc" },
+  });
+  return accounts.map((a) => ({
+    id: a.id,
+    name: a.name,
+    casePrefix: a.casePrefix,
+    signature: a.signature ?? "",
+    adapterType: a.adapterType,
+    ticketCount: a._count.tickets,
+    operatorCount: a._count.operators,
+  }));
+}
+
+export async function createAccount(input: {
+  name: string;
+  casePrefix: string;
+  signature?: unknown;
+}): Promise<AdminResult<{ id: string }>> {
+  const v = validateNewAccount({ name: input.name ?? "", casePrefix: input.casePrefix ?? "" });
+  if (!v.ok) return { kind: "invalid", reason: v.reason };
+
+  const casePrefix = input.casePrefix.trim();
+  // casePrefix は採番の一意キー。重複すると連番が衝突するため事前に拒否する。
+  const dup = await prisma.mailAccount.findFirst({ where: { casePrefix }, select: { id: true } });
+  if (dup) return { kind: "invalid", reason: "その採番接頭辞は既に使われています" };
+
+  const sig = normalizeSignature(input.signature);
+  const created = await prisma.mailAccount.create({
+    data: {
+      name: input.name.trim(),
+      casePrefix,
+      signature: sig === undefined ? null : sig,
+      config: {},
+    },
+    select: { id: true },
+  });
+  return { kind: "ok", value: { id: created.id } };
+}
+
+// 窓口更新。name/signature のみ(casePrefix は不変)。存在しなければ not_found。
+export async function updateAccount(
+  id: string,
+  input: { name?: string; signature?: unknown },
+): Promise<AdminResult> {
+  const existing = await prisma.mailAccount.findUnique({ where: { id }, select: { id: true } });
+  if (!existing) return { kind: "not_found" };
+  if (input.name !== undefined && input.name.trim() === "") {
+    return { kind: "invalid", reason: "窓口名を入力してください" };
+  }
+  await prisma.mailAccount.update({
+    where: { id },
+    data: {
+      name: input.name !== undefined ? input.name.trim() : undefined,
+      signature: normalizeSignature(input.signature),
+    },
+  });
   return { kind: "ok", value: undefined };
 }

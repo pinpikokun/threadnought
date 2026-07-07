@@ -62,3 +62,24 @@ export function normalizeColor(color: unknown): string | null {
   const trimmed = color.trim();
   return trimmed === "" ? null : trimmed;
 }
+
+export const MAX_CASE_PREFIX_LENGTH = 16;
+const CASE_PREFIX_RE = /^[A-Za-z0-9-]+$/;
+
+// 新規窓口の検証。name 必須・casePrefix は英数とハイフンのみ・長さ上限。
+// casePrefix は採番(Counter)キーのため、作成後は変更不可の前提。
+export function validateNewAccount(input: { name: string; casePrefix: string }): ValidationResult {
+  if ((input.name?.trim() ?? "") === "") return { ok: false, reason: "窓口名を入力してください" };
+  const prefix = input.casePrefix?.trim() ?? "";
+  if (prefix === "") return { ok: false, reason: "採番接頭辞を入力してください" };
+  if (prefix.length > MAX_CASE_PREFIX_LENGTH) return { ok: false, reason: "採番接頭辞が長すぎます" };
+  if (!CASE_PREFIX_RE.test(prefix)) return { ok: false, reason: "採番接頭辞は英数字とハイフンのみ使えます" };
+  return { ok: true };
+}
+
+// signature の正規化: 未指定は skip(undefined)、空文字は null、それ以外はそのまま。
+export function normalizeSignature(sig: unknown): string | null | undefined {
+  if (sig === undefined) return undefined;
+  if (typeof sig !== "string") return null;
+  return sig === "" ? null : sig;
+}

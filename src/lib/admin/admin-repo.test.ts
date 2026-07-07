@@ -11,6 +11,9 @@ import {
   createLabel,
   updateLabel,
   deleteLabel,
+  listAccountsDetail,
+  createAccount,
+  updateAccount,
 } from "./admin-repo";
 
 // 非重複PREFIX(既存 LKUP/MGCND/NUMT/OP/MS/AUTH/SESS/TLST/SX*/ADMOP と前方一致しない)。
@@ -165,5 +168,51 @@ describe("ラベルCRUD", () => {
     const labels = await listLabels();
     expect(labels.find((l) => l.id === id)).toBeUndefined();
     expect((await deleteLabel("nonexistent-admop-label")).kind).toBe("not_found");
+  });
+});
+
+describe("窓口(MailAccount)管理", () => {
+  it("作成→詳細一覧に現れ、ticket/operator数0・空 config で登録される", async () => {
+    const res = await createAccount({ name: `${PREFIX}新窓口`, casePrefix: `${PREFIX}C`, signature: "敬具" });
+    expect(res.kind).toBe("ok");
+    const id = (res as { kind: "ok"; value: { id: string } }).value.id;
+
+    const accs = await listAccountsDetail();
+    const mine = accs.find((a) => a.id === id)!;
+    expect(mine.name).toBe(`${PREFIX}新窓口`);
+    expect(mine.casePrefix).toBe(`${PREFIX}C`);
+    expect(mine.signature).toBe("敬具");
+    expect(mine.ticketCount).toBe(0);
+    expect(mine.operatorCount).toBe(0);
+
+    const raw = await prisma.mailAccount.findUnique({ where: { id }, select: { config: true } });
+    expect(raw!.config).toEqual({});
+  });
+
+  it("casePrefix 重複は invalid(beforeAll の ADMOPA と衝突)", async () => {
+    const res = await createAccount({ name: "dup", casePrefix: `${PREFIX}A` });
+    expect(res.kind).toBe("invalid");
+  });
+
+  it("接頭辞に空白/記号は invalid", async () => {
+    expect((await createAccount({ name: "x", casePrefix: `${PREFIX} X` })).kind).toBe("invalid");
+  });
+
+  it("name/signature を更新でき、casePrefix は不変", async () => {
+    const created = await createAccount({ name: `${PREFIX}upd`, casePrefix: `${PREFIX}U` });
+    const id = (created as { kind: "ok"; value: { id: string } }).value.id;
+
+    const res = await updateAccount(id, { name: `${PREFIX}renamed`, signature: "" });
+    expect(res.kind).toBe("ok");
+
+    const accs = await listAccountsDetail();
+    const mine = accs.find((a) => a.id === id)!;
+    expect(mine.name).toBe(`${PREFIX}renamed`);
+    expect(mine.signature).toBe(""); // "" → null → 表示は ""
+    expect(mine.casePrefix).toBe(`${PREFIX}U`); // 不変
+  });
+
+  it("存在しない id の更新は not_found", async () => {
+    expect((await updateAccount("nonexistent-admop-acc", { name: "x" })).kind).toBe("not_found");
   });
 });
