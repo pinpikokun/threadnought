@@ -2,12 +2,13 @@ import { redirect, notFound } from "next/navigation";
 import { getCurrentActor } from "@/lib/auth/current";
 import { assertTicketAccess } from "@/lib/auth/access";
 import { loadTicketDetail } from "@/lib/ops/ticket-detail";
-import { loadAssignableOperators, loadAllLabels } from "@/lib/ops/lookups";
+import { loadAssignableOperators, loadAllLabels, loadMergeCandidates } from "@/lib/ops/lookups";
 import { t } from "@/lib/i18n/ja";
 import { StatusBadge, TimelineView } from "./parts";
 import { ReplyForm } from "./reply-form";
 import { StatusControl, AddNoteForm } from "./ticket-actions";
 import { AssigneeControl, LabelControl } from "./assignment";
+import { MergeControl } from "./merge-split";
 
 export const dynamic = "force-dynamic";
 
@@ -24,13 +25,17 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
   if (!detail) notFound();
 
   // access=ok を確認済みの後にのみ候補を引く(ローダー自体も窓口スコープで二重に安全)。
-  const [operators, allLabels] = await Promise.all([
+  const [operators, allLabels, mergeCandidates] = await Promise.all([
     loadAssignableOperators(id),
     loadAllLabels(),
+    loadMergeCandidates(id),
   ]);
-  if (operators === null) notFound();
+  if (operators === null || mergeCandidates === null) notFound();
 
   const { header, timeline } = detail;
+
+  // メールが2通以上ある時だけ分割を許す(唯一のメールは切り出せない)。
+  const canSplit = timeline.filter((it) => it.kind === "message").length > 1;
 
   // 直近の受信(INBOUND)差出人を返信先の初期値にする。
   let defaultTo = "";
@@ -67,8 +72,9 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
           actorOperatorId={actor.operatorId}
         />
         <LabelControl ticketId={header.id} currentLabels={header.labels} allLabels={allLabels} />
+        <MergeControl ticketId={header.id} candidates={mergeCandidates} />
       </div>
-      <TimelineView items={timeline} />
+      <TimelineView items={timeline} splitTicketId={header.id} canSplit={canSplit} />
       <AddNoteForm ticketId={header.id} />
       <ReplyForm ticketId={header.id} defaultTo={defaultTo} />
     </main>

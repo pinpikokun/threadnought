@@ -3,6 +3,7 @@ import { formatBytes } from "@/lib/format/bytes";
 import { t } from "@/lib/i18n/ja";
 import type { TimelineItem, AttachmentMeta } from "@/lib/ops/timeline";
 import type { TicketStatus } from "@/generated/prisma/client";
+import { SplitButton } from "./merge-split";
 
 export function StatusBadge({ status }: { status: TicketStatus }) {
   const bg = status === "DONE" ? "#16a34a" : status === "IN_PROGRESS" ? "#2563eb" : "#9ca3af";
@@ -44,7 +45,15 @@ function MessageBody({ bodyHtml, bodyText }: { bodyHtml: string | null; bodyText
   return <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{bodyText ?? ""}</div>;
 }
 
-export function TimelineView({ items }: { items: TimelineItem[] }) {
+export function TimelineView({
+  items,
+  splitTicketId,
+  canSplit = false,
+}: {
+  items: TimelineItem[];
+  splitTicketId?: string;
+  canSplit?: boolean;
+}) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       {items.map((item) => {
@@ -52,9 +61,12 @@ export function TimelineView({ items }: { items: TimelineItem[] }) {
           const inbound = item.direction === "INBOUND";
           return (
             <div key={item.id} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "1rem", background: inbound ? "#fff" : "#f8fafc" }}>
-              <div style={{ fontSize: 13, color: "#555", marginBottom: ".5rem", display: "flex", justifyContent: "space-between" }}>
+              <div style={{ fontSize: 13, color: "#555", marginBottom: ".5rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: ".5rem" }}>
                 <span><strong>{t.directionLabel[item.direction]}</strong> · {item.fromAddr}</span>
-                <span>{item.at.toLocaleString("ja-JP")}</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: ".5rem" }}>
+                  {item.at.toLocaleString("ja-JP")}
+                  {splitTicketId && <SplitButton ticketId={splitTicketId} messageId={item.id} canSplit={canSplit} />}
+                </span>
               </div>
               <div style={{ fontSize: 13, color: "#333", marginBottom: ".5rem" }}>{item.subject}</div>
               <MessageBody bodyHtml={item.bodyHtml} bodyText={item.bodyText} />
