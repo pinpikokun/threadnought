@@ -59,6 +59,8 @@ export type TicketHeader = {
   assigneeName: string | null;
   labels: { id: string; name: string; color: string }[];
   accountName: string;
+  isPinned: boolean;
+  dueDate: Date | null;
 };
 
 export type TicketDetail = { header: TicketHeader; timeline: TimelineItem[] };
@@ -69,7 +71,7 @@ export async function loadTicketDetail(ticketId: string): Promise<TicketDetail |
     where: { id: ticketId },
     select: {
       id: true, caseNumber: true, title: true, subject: true, status: true,
-      assigneeId: true,
+      assigneeId: true, isPinned: true, dueDate: true,
       assignee: { select: { displayName: true } },
       labels: { select: { id: true, name: true, color: true } },
       account: { select: { name: true } },
@@ -91,6 +93,8 @@ export async function loadTicketDetail(ticketId: string): Promise<TicketDetail |
       // Label.color はスキーマ上 nullable。表示用に既定色へ寄せる。
       labels: ticket.labels.map((l) => ({ id: l.id, name: l.name, color: l.color ?? "" })),
       accountName: ticket.account.name,
+      isPinned: ticket.isPinned,
+      dueDate: ticket.dueDate,
     },
     timeline,
   };

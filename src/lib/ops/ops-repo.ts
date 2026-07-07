@@ -217,3 +217,36 @@ export async function splitMessage(input: {
   });
   return { kind: "ok", newTicketId, caseNumber };
 }
+
+// チケットの件名・ピン留め・期日を部分更新する。
+// 注: これらの編集は現状 AuditLog に記録しない(専用 AuditAction が未整備のため)。
+// 監査が必要になった時点で enum 追加(本番マイグレーション)とあわせて writeAudits を足す。
+export async function updateTicketFields(input: {
+  ticketId: string;
+  title?: string;
+  isPinned?: boolean;
+  dueDate?: string | null; // ISO文字列 or null(=期日クリア)
+}): Promise<OpResult> {
+  const ticket = await prisma.ticket.findUnique({ where: { id: input.ticketId }, select: { id: true } });
+  if (!ticket) return { kind: "not_found" };
+
+  const data: Prisma.TicketUpdateInput = {};
+  if (input.title !== undefined) {
+    if (input.title.trim() === "") return { kind: "invalid", reason: "件名を入力してください" };
+    data.title = input.title.trim();
+  }
+  if (input.isPinned !== undefined) data.isPinned = input.isPinned;
+  if (input.dueDate !== undefined) {
+    if (input.dueDate === null || input.dueDate === "") {
+      data.dueDate = null;
+    } else {
+      const d = new Date(input.dueDate);
+      if (Number.isNaN(d.getTime())) return { kind: "invalid", reason: "期日の形式が不正です" };
+      data.dueDate = d;
+    }
+  }
+
+  if (Object.keys(data).length === 0) return { kind: "ok", changed: false };
+  await prisma.ticket.update({ where: { id: input.ticketId }, data });
+  return { kind: "ok", changed: true };
+}

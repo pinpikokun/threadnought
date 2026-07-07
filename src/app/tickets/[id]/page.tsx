@@ -9,6 +9,7 @@ import { ReplyForm } from "./reply-form";
 import { StatusControl, AddNoteForm } from "./ticket-actions";
 import { AssigneeControl, LabelControl } from "./assignment";
 import { MergeControl } from "./merge-split";
+import { PinToggle, TitleEditor, DueDateControl } from "./ticket-fields";
 import { AppHeader } from "../../app-header";
 
 export const dynamic = "force-dynamic";
@@ -55,8 +56,14 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
       <a href="/" style={{ fontSize: 13 }}>← 一覧へ戻る</a>
       <header style={{ borderBottom: "1px solid #ddd", paddingBottom: ".75rem", margin: ".5rem 0 1rem" }}>
         <div style={{ fontSize: 12, color: "#888" }}>{header.caseNumber} · {header.accountName}</div>
-        <h1 style={{ fontSize: 20, margin: ".25rem 0" }}>{header.title}</h1>
-        <div style={{ fontSize: 13, color: "#555", marginBottom: ".5rem" }}>{header.subject}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: ".4rem", margin: ".25rem 0" }}>
+          <PinToggle ticketId={header.id} initial={header.isPinned} />
+          <h1 style={{ fontSize: 20, margin: 0 }}>{header.title}</h1>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: ".75rem", marginBottom: ".5rem", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 13, color: "#555" }}>{header.subject}</span>
+          <TitleEditor ticketId={header.id} initial={header.title} />
+        </div>
         <div style={{ display: "flex", gap: ".5rem", alignItems: "center", flexWrap: "wrap" }}>
           <StatusBadge status={header.status} />
           <span style={{ fontSize: 13 }}>{t.assignee}: {header.assigneeName ?? "未割り当て"}</span>
@@ -75,6 +82,7 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
           actorOperatorId={actor.operatorId}
         />
         <LabelControl ticketId={header.id} currentLabels={header.labels} allLabels={allLabels} />
+        <DueDateControl ticketId={header.id} initialIso={header.dueDate ? header.dueDate.toISOString() : null} />
         <MergeControl ticketId={header.id} candidates={mergeCandidates} />
       </div>
       <TimelineView items={timeline} splitTicketId={header.id} canSplit={canSplit} />
