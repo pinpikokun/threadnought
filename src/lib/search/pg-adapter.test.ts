@@ -8,6 +8,7 @@ let accountB = "";
 let ticketApple = "";
 let ticketBanana = "";
 let ticketOtherWindow = "";
+let ticketContact = "";
 
 beforeAll(async () => {
   const a = await prisma.mailAccount.create({ data: { name: "検索窓口A", casePrefix: `${PREFIX}A`, config: {} } });
@@ -59,11 +60,39 @@ beforeAll(async () => {
     },
   });
   ticketOtherWindow = other.id;
+
+  // Contact 結合列(email/name/company)経由の検索を突くための固定データ。
+  // チケット本体(title/subject/body/差出人)には検索語を一切入れず、
+  // ヒットが Contact 列由来であることを保証する。窓口Aに所属。
+  const contact = await prisma.contact.create({
+    data: {
+      email: `${PREFIX}-buyer@zenith.example`,
+      name: `${PREFIX}ナオヤ商店`,
+      company: `ゼニス${PREFIX}物産`,
+    },
+  });
+  const contactTicket = await prisma.ticket.create({
+    data: {
+      caseNumber: `${PREFIX}A-000003`, token: `${PREFIX}A-000003`,
+      title: "第三の問い合わせ", subject: "一般のご相談",
+      accountId: accountA, status: "UNHANDLED", messageCount: 1,
+      contactId: contact.id,
+      messages: { create: {
+        direction: "INBOUND", messageId: `<${PREFIX}-contact@example.com>`, references: [],
+        fromAddr: "generic@example.com", toAddrs: ["support@example.com"],
+        subject: "一般のご相談", bodyText: "内容は特にありません。",
+        sentAt: new Date("2026-06-26T12:00:00Z"),
+      } },
+    },
+  });
+  ticketContact = contactTicket.id;
 });
 
 afterAll(async () => {
   await prisma.message.deleteMany({ where: { ticket: { caseNumber: { startsWith: PREFIX } } } });
   await prisma.ticket.deleteMany({ where: { caseNumber: { startsWith: PREFIX } } });
+  // Contact は Ticket から参照されるため、チケット削除後に消す。
+  await prisma.contact.deleteMany({ where: { email: { startsWith: PREFIX } } });
   await prisma.mailAccount.deleteMany({ where: { casePrefix: { startsWith: PREFIX } } });
   await prisma.$disconnect();
 });
@@ -104,5 +133,34 @@ describe("pgTrgmSearchProvider.search", () => {
   it("index/remove は no-op（例外を投げない）", async () => {
     await expect(pgTrgmSearchProvider.index(ticketApple)).resolves.toBeUndefined();
     await expect(pgTrgmSearchProvider.remove(ticketApple)).resolves.toBeUndefined();
+  });
+});
+
+describe("pgTrgmSearchProvider.search Contact結合列(6a M1回帰)", () => {
+  it("顧客メールアドレスの一致で見つかる", async () => {
+    const ids = await pgTrgmSearchProvider.search("zenith.example", { role: "ADMIN", accountIds: [] });
+    expect(ids).toContain(ticketContact);
+    // 本体テキストには zenith を含めていないので、他チケットは混ざらない
+    expect(ids).not.toContain(ticketApple);
+  });
+
+  it("顧客名の一致で見つかる", async () => {
+    const ids = await pgTrgmSearchProvider.search(`${PREFIX}ナオヤ商店`, { role: "ADMIN", accountIds: [] });
+    expect(ids).toContain(ticketContact);
+  });
+
+  it("会社名の一致で見つかる", async () => {
+    const ids = await pgTrgmSearchProvider.search(`ゼニス${PREFIX}物産`, { role: "ADMIN", accountIds: [] });
+    expect(ids).toContain(ticketContact);
+  });
+
+  it("非ADMINでも自窓口(A)なら Contact 一致で見つかる", async () => {
+    const ids = await pgTrgmSearchProvider.search("zenith.example", { role: "MEMBER", accountIds: [accountA] });
+    expect(ids).toContain(ticketContact);
+  });
+
+  it("非ADMINで別窓口(B)からは Contact 一致でも見えない", async () => {
+    const ids = await pgTrgmSearchProvider.search("zenith.example", { role: "MEMBER", accountIds: [accountB] });
+    expect(ids).not.toContain(ticketContact);
   });
 });
