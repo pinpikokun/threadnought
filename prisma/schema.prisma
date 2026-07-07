@@ -55,7 +55,21 @@ model Operator {
   notes        Note[]
   audits       AuditLog[]
   sessions     Session[]
+  pushSubscriptions PushSubscription[]
   createdAt    DateTime      @default(now())
+}
+
+// Web Push の購読情報(ブラウザの PushSubscription)。1オペレータが複数端末を持ちうる。
+model PushSubscription {
+  id         String   @id @default(cuid())
+  operatorId String
+  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  createdAt  DateTime @default(now())
+
+  @@index([operatorId])
 }
 
 model MailAccount {

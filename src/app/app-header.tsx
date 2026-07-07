@@ -4,6 +4,7 @@ import { t } from "@/lib/i18n/ja";
 import type { AppActor } from "@/lib/auth/current";
 import { LogoutButton } from "./logout-button";
 import { NotificationBell } from "./notification-bell";
+import { PushSubscribeToggle } from "./push-subscribe";
 
 // 認証済みページ共通のヘッダー。アプリ名(一覧へのリンク)＋操作者名/ロール＋ログアウト。
 // /login には表示しない(各認証ページが actor を渡して描画する)。
@@ -36,6 +37,7 @@ export async function AppHeader({ actor }: { actor: AppActor }) {
         )}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: ".75rem", fontSize: 13, color: "#555" }}>
+        <PushSubscribeToggle />
         <NotificationBell />
         {op && (
           <span>

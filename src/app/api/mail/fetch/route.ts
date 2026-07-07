@@ -4,6 +4,7 @@ import { ImapReceiver, type ImapConfig } from "@/lib/mail/adapters/imap";
 import { ingestNew } from "@/lib/mail/ingest";
 import { prismaIngestRepository } from "@/lib/mail/ingest-repo";
 import { publishNotification, type NotifyEvent } from "@/lib/notify/bus";
+import { sendPushToOperators, recipientsForAccount, webPushEnabled } from "@/lib/notify/web-push";
 
 export const dynamic = "force-dynamic";
 
@@ -40,9 +41,33 @@ export async function POST(req: NextRequest) {
     });
     const byId = new Map(metas.map((m) => [m.id, m]));
     const at = Date.now();
+    const typeLabel: Record<NotifyEvent["type"], string> = {
+      ticket_created: "新規チケット",
+      message_appended: "新着メール",
+      ticket_reopened: "再オープン",
+    };
+    // 窓口ごとの配信先(オペレータid)を一度だけ解決してキャッシュする。
+    const recipientsCache = new Map<string, string[]>();
+
     for (const a of affected) {
       const m = byId.get(a.ticketId);
-      if (m) publishNotification({ type: a.type, accountId: m.accountId, ticketId: m.id, caseNumber: m.caseNumber, title: m.title, at });
+      if (!m) continue;
+      // アプリ内(SSE)通知。
+      publishNotification({ type: a.type, accountId: m.accountId, ticketId: m.id, caseNumber: m.caseNumber, title: m.title, at });
+
+      // ブラウザ(Web Push)通知。VAPID未設定なら丸ごとスキップ。
+      if (webPushEnabled()) {
+        let recipients = recipientsCache.get(m.accountId);
+        if (!recipients) {
+          recipients = await recipientsForAccount(m.accountId);
+          recipientsCache.set(m.accountId, recipients);
+        }
+        await sendPushToOperators(recipients, {
+          title: `${typeLabel[a.type]} ${m.caseNumber}`,
+          body: m.title,
+          url: `/tickets/${m.id}`,
+        });
+      }
     }
   }
 
