@@ -2,10 +2,12 @@ import { redirect, notFound } from "next/navigation";
 import { getCurrentActor } from "@/lib/auth/current";
 import { assertTicketAccess } from "@/lib/auth/access";
 import { loadTicketDetail } from "@/lib/ops/ticket-detail";
+import { loadAssignableOperators, loadAllLabels } from "@/lib/ops/lookups";
 import { t } from "@/lib/i18n/ja";
 import { StatusBadge, TimelineView } from "./parts";
 import { ReplyForm } from "./reply-form";
 import { StatusControl, AddNoteForm } from "./ticket-actions";
+import { AssigneeControl, LabelControl } from "./assignment";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,13 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 
   const detail = await loadTicketDetail(id);
   if (!detail) notFound();
+
+  // access=ok を確認済みの後にのみ候補を引く(ローダー自体も窓口スコープで二重に安全)。
+  const [operators, allLabels] = await Promise.all([
+    loadAssignableOperators(id),
+    loadAllLabels(),
+  ]);
+  if (operators === null) notFound();
 
   const { header, timeline } = detail;
 
@@ -48,8 +57,16 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
           ))}
         </div>
       </header>
-      <div style={{ margin: "0 0 1rem" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: ".5rem", margin: "0 0 1rem" }}>
         <StatusControl ticketId={header.id} current={header.status} />
+        <AssigneeControl
+          ticketId={header.id}
+          currentAssigneeId={header.assigneeId}
+          operators={operators}
+          actorRole={actor.role}
+          actorOperatorId={actor.operatorId}
+        />
+        <LabelControl ticketId={header.id} currentLabels={header.labels} allLabels={allLabels} />
       </div>
       <TimelineView items={timeline} />
       <AddNoteForm ticketId={header.id} />

@@ -50,6 +50,7 @@ describe("loadTicketDetail", () => {
     expect(d!.header.caseNumber).toBe(`${PREFIX}A-000001`);
     expect(d!.header.title).toBe("詳細タイトル");
     expect(d!.header.status).toBe("IN_PROGRESS");
+    expect(d!.header.assigneeId).not.toBeNull();
     expect(d!.header.assigneeName).toBe("担当花子");
     expect(d!.header.accountName).toBe("詳細窓口");
     expect(d!.header.labels.map((l) => l.name)).toContain(`重要${PREFIX}`);
