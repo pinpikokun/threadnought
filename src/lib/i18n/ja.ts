@@ -24,4 +24,15 @@ export const t = {
     UNPINNED: "ピン留めを解除",
     DUE_DATE_CHANGED: "期日を変更",
   },
+  adminAuditLabel: {
+    OPERATOR_CREATED: "オペレータを作成",
+    OPERATOR_UPDATED: "オペレータを更新",
+    OPERATOR_PASSWORD_RESET: "パスワードを再設定",
+    LABEL_CREATED: "ラベルを作成",
+    LABEL_UPDATED: "ラベルを更新",
+    LABEL_DELETED: "ラベルを削除",
+    ACCOUNT_CREATED: "窓口を作成",
+    ACCOUNT_UPDATED: "窓口を更新",
+  },
+  adminTargetLabel: { operator: "オペレータ", label: "ラベル", account: "窓口" },
 } as const;
